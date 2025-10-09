@@ -1,5 +1,14 @@
 [![HACS](https://img.shields.io/badge/HACS-Default-orange.svg?style=for-the-badge)](https://hacs.xyz/)
-[![GitHub Release](https://img.shields.io/github/v/release/jonavdbrink/bms?style=for-the-badge&label=Release)](https://github.com/jonavdbrink/zonneplan_bms/releases)
+![Active installations](https://badge.t-haber.de/badge/zonneplan_one?kill_cache=1)
+[![GitHub Release](https://img.shields.io/github/v/release/jonavdbrink/bms?style=for-the-badge&label=Release)](https://github.com/jonavdbrink/bms/releases)
+![GitHub License](https://img.shields.io/github/license/fsaris/home-assistant-zonneplan-one?style=for-the-badge)
+![stability-stable](https://img.shields.io/badge/stability-stable-red.svg?style=for-the-badge&color=red)
+
+![Zonneplan peakdetection](./images/logo.png)
+
+<p align="center">
+  <img src="https://raw.githubusercontent.com/jonavdbrink/bms/images/logo.png" width="250">
+</p>
 
 Repository based on: https://github.com/fsaris/home-assistant-zonneplan-one
 
