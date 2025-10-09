@@ -3,6 +3,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.core import callback
 from .const import DOMAIN, PEAK_SENSOR, VALLEY_SENSOR, PRICE_SENSOR
+from homeassistant.helpers.device_registry import DeviceInfo
 
 import json
 
@@ -41,6 +42,16 @@ class BasePriceSensor(Entity):
             return [float(p) for p in prices]
         except (ValueError, TypeError):
             return []
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        return DeviceInfo(
+            identifiers={(DOMAIN, "zonneplan_bms")},
+            name="Zonneplan BMS",
+            manufacturer="Zonneplan",
+            model="BMS",
+            entry_type="service"
+        )
 
 class ZonneplanPeakSensor(BasePriceSensor):
     def _update_state(self):
