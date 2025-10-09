@@ -1,0 +1,11 @@
+{
+  "title": "Zonneplan Peak Detect",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configureer Zonneplan Peak Detection",
+        "description": "Geen opties vereist."
+      }
+    }
+  }
+}
