@@ -1,0 +1,11 @@
+{
+  "title": "Zonneplan Peak Detect",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Configure Zonneplan Peak Detection",
+        "description": "No options required."
+      }
+    }
+  }
+}

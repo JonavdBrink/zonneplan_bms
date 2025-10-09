@@ -1,0 +1,11 @@
+{
+  "domain": "zonneplan_peakdetect",
+  "name": "Zonneplan Peak Detect",
+  "version": "0.0.0",
+  "documentation": "https://github.com/jonavdbrink/bms",
+  "issue_tracker": "https://github.com/jonavdbrink/bms/issues",
+  "dependencies": [],
+  "codeowners": ["@JonavdBrink","TvdBrink"],
+  "requirements": [],
+  "iot_class": "local_polling"
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Zonneplan Peak Detect",
+  "homeassistant": "2025.10.1",
+  "render_readme": true,
+  "country": "NL"
+}
