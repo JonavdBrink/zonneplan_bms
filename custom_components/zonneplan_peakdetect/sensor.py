@@ -5,6 +5,7 @@ from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.core import callback
 from homeassistant.const import STATE_ON, STATE_OFF
+from homeassistant.components.sensor import SensorEntity
 from datetime import datetime, timezone
 from .const import DOMAIN, FORECAST_SENSOR, PEAK_SENSOR, LOGGER
 from homeassistant.helpers.device_registry import DeviceInfo
@@ -33,6 +34,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     async_add_entities(sensors, True)
 
 class PeakSensor(Entity):
+    _attr_icon = "mdi:code-array"
     def __init__(self, hass, name):
         self.hass = hass
         self._attr_name = name.replace("_", " ").title()
