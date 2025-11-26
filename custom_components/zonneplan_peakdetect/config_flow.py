@@ -26,7 +26,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             vol.Required(
                 CONF_PERCENTAGE, 
                 default=DEFAULT_PERCENTAGE
-            ): float,
+            ): int,
             
             # Bedrag in Centen: type integer (centen zijn gehele getallen), met een standaardwaarde
             vol.Required(
