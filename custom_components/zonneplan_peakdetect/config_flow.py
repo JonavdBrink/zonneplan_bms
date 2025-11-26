@@ -4,7 +4,7 @@ import homeassistant.helpers.config_validation as cv
 from homeassistant import config_entries
 from homeassistant.core import callback
 
-from .const import CONF_PERCENTAGE, CONF_CENTS, DOMAIN, DEFAULT_PERCENTAGE, DEFAULT_CENTS
+from .const import CONF_PERCENTAGE, CONF_CENTS, CONF_CHARGE_HOURS, CONF_DISCHARGE_HOURS, DOMAIN, DEFAULT_PERCENTAGE, DEFAULT_CENTS, DEFAULT_CHARGE_HOURS, DEFAULT_DISCHARGE_HOURS
 
 class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Behandelt een config flow voor jouw integratie."""
@@ -23,6 +23,8 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         data_schema = vol.Schema({
             vol.Required(CONF_PERCENTAGE, default=DEFAULT_PERCENTAGE): vol.All(vol.Coerce(float), vol.Range(min=1.0, max=100.0)),
             vol.Required(CONF_CENTS, default=DEFAULT_CENTS): cv.positive_int,
+            vol.Required(CONF_CHARGE_HOURS, default=DEFAULT_CHARGE_HOURS): cv.positive_int,
+            vol.Required(CONF_DISCHARGE_HOURS, default=DEFAULT_DISCHARGE_HOURS): cv.positive_int,
         })
 
         return self.async_show_form(
