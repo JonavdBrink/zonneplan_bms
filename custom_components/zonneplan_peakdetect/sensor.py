@@ -7,7 +7,7 @@ from homeassistant.core import callback
 from homeassistant.const import STATE_ON, STATE_OFF
 from homeassistant.components.sensor import SensorEntity
 from datetime import datetime, timezone, timedelta
-from .const import DOMAIN, FORECAST_SENSOR, PEAK_SENSOR, LOGGER
+from .const import DOMAIN, FORECAST_SENSOR, PEAK_SENSOR, LOGGER, CONF_PERCENTAGE, CONF_CENTS
 from homeassistant.helpers.device_registry import DeviceInfo
 
 import json
@@ -28,15 +28,25 @@ def map_dict_to_entry(data: dict) -> ForecastEntry:
     )
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
-    sensors = [
-        PeakSensor(hass, PEAK_SENSOR),
+    # sensors = [
+    #     PeakSensor(hass, PEAK_SENSOR)
+    # ]
+    # Haal de opgeslagen configuratie op
+    config = hass.data[DOMAIN]
+    
+    rte_minimal_percentage = config[CONF_PERCENTAGE]
+    rte_minimal_cents = config[CONF_CENTS]
+
+    # De sensor-entiteit aanmaken en toevoegen
+    async_add_entities([
+        PeakSensor(hass, PEAK_SENSOR, rte_minimal_percentage, rte_minimal_cents),
         BatteryOptimizerSensor(hass, DEFAULT_NAME)
-    ]
-    async_add_entities(sensors, True)
+    ], True)
+    # async_add_entities(sensors, True)
 
 class PeakSensor(Entity):
     _attr_icon = "mdi:code-array"
-    def __init__(self, hass, name):
+    def __init__(self, hass, name, percentage, cents):
         self.hass = hass
         self._attr_name = name.replace("_", " ").title()
         self._attr_unique_id = f"{DOMAIN}_{name}"
@@ -46,6 +56,8 @@ class PeakSensor(Entity):
         self._charge_hours = 2
         self._discharge_hours = 2
         self._rte = 0.75
+        self._rte_minimal_percentage = percentage
+        self._rte_minimal_cents = cents
 
     async def async_added_to_hass(self):
         async_track_state_change_event(self.hass, FORECAST_SENSOR, self._async_state_changed)

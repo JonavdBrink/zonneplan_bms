@@ -1,0 +1,13 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "data": {
+          "percentage_waarde": "Percentage toeslag",
+          "bedrag_in_centen": "Vast bedrag (in centen, bijv. 100 voor €1)"
+        },
+        "description": "Voer de configuratiewaarden voor de sensor in."
+      }
+    }
+  }
+}
