@@ -393,13 +393,13 @@ class BatteryOptimizerSensor(SensorEntity):
         self._attributes['schedule'] = schedule
 
         # Determine the current action based on the nearest future hour
-        now_dt = self._hass.helpers.datetime.now()
+        now_dt = datetime.now(timezone.utc)
         current_action = ACTION_STOP
 
         for hour in schedule:
             try:
                 # Use datetime component to parse the timestamp
-                hour_dt = self._hass.helpers.datetime.parse_datetime(hour['datetime'])
+                hour_dt = datetime.parse_datetime(hour['datetime'])
             except ValueError:
                 LOGGER.warning(f"Could not parse datetime: {hour['datetime']}")
                 continue
