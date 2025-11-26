@@ -6,8 +6,7 @@ from typing import TYPE_CHECKING
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
 
-# from .const import DOMAIN, LOGGER
-from .const import DOMAIN, LOGGER, CONF_PERCENTAGE, CONF_CENTS, CONF_CHARGE_HOURS, CONF_DISCHARGE_HOURS
+from .const import DOMAIN, CONF_FORECAST_ENTITY, CONF_RTE_PERCENT, CONF_MIN_PROFIT, CONF_CHARGE_HOURS, CONF_DISCHARGE_HOURS
 
 from .data import ZonneplanBmsConfigEntry
 
@@ -17,8 +16,6 @@ if TYPE_CHECKING:
 
 PLATFORMS: list[Platform] = [
     Platform.SENSOR,
-    # Platform.BINARY_SENSOR,
-    # Platform.SWITCH,
 ]
 
 async def async_setup_entry(
@@ -27,17 +24,19 @@ async def async_setup_entry(
 ) -> bool:
     """Set up this integration using UI."""
     # Haal de opgeslagen waarden op uit de entry.data dictionary
-    percentage = entry.data[CONF_PERCENTAGE]
-    cents = entry.data[CONF_CENTS]
+    price_delta_percent = entry.data[CONF_RTE_PERCENT]
+    min_profit_c_kwh = entry.data[CONF_MIN_PROFIT]
     charge_hours = entry.data[CONF_CHARGE_HOURS]
     discharge_hours = entry.data[CONF_DISCHARGE_HOURS]
+    forecast_entity = entry.data[CONF_FORECAST_ENTITY]
 
     # Sla de configuratie op in het 'data' domein van de Home Assistant core
     hass.data[DOMAIN] = {
-        CONF_PERCENTAGE: percentage,
-        CONF_CENTS: cents,
+        CONF_RTE_PERCENT: price_delta_percent,
+        CONF_MIN_PROFIT: min_profit_c_kwh,
         CONF_CHARGE_HOURS: charge_hours,
         CONF_DISCHARGE_HOURS: discharge_hours,
+        CONF_FORECAST_ENTITY: forecast_entity
     }
 
     # Sensorplatform laden

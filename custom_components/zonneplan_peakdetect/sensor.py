@@ -3,12 +3,12 @@ from typing import Any, Dict, Optional, List
 from homeassistant.helpers.entity import Entity
 # from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.event import async_track_state_change_event
-from homeassistant.core import callback
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.const import STATE_ON, STATE_OFF
 from homeassistant.components.sensor import SensorEntity
 from datetime import datetime, timezone, timedelta
-from .const import DOMAIN, FORECAST_SENSOR, PEAK_SENSOR, LOGGER, CONF_PERCENTAGE, CONF_CENTS, CONF_CHARGE_HOURS, CONF_DISCHARGE_HOURS
-from homeassistant.helpers.device_registry import DeviceInfo
+from .const import DOMAIN, FORECAST_SENSOR, PEAK_SENSOR, LOGGER, CONF_FORECAST_ENTITY, CONF_RTE_PERCENT, CONF_MIN_PROFIT, CONF_CHARGE_HOURS, CONF_DISCHARGE_HOURS
+from homeassistant.helpers.device_registry import DeviceInfo, DeviceEntryType
 
 import json
 
@@ -28,23 +28,27 @@ def map_dict_to_entry(data: dict) -> ForecastEntry:
     )
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
-    # sensors = [
-    #     PeakSensor(hass, PEAK_SENSOR)
-    # ]
-    # Haal de opgeslagen configuratie op
+    """Set up the Battery Optimizer Sensor."""
     config = hass.data[DOMAIN]
     
-    rte_minimal_percentage = config[CONF_PERCENTAGE]
-    rte_minimal_cents = config[CONF_CENTS]
-    charge_hours = config[CONF_CHARGE_HOURS]
-    discharge_hours = config[CONF_DISCHARGE_HOURS]
+    forecast_entity_id = config.get(CONF_FORECAST_ENTITY)
+    charge_hours = config.get(CONF_CHARGE_HOURS)
+    discharge_hours = config.get(CONF_DISCHARGE_HOURS)
+    price_delta_percent = config.get(CONF_RTE_PERCENT)
+    min_profit_c_kwh = config.get(CONF_MIN_PROFIT)
 
-    # De sensor-entiteit aanmaken en toevoegen
     async_add_entities([
-        PeakSensor(hass, PEAK_SENSOR, rte_minimal_percentage, rte_minimal_cents, charge_hours, discharge_hours),
-        BatteryOptimizerSensor(hass, DEFAULT_NAME)
+        PeakSensor(hass, PEAK_SENSOR, price_delta_percent, min_profit_c_kwh, charge_hours, discharge_hours),
+        BatteryOptimizerSensor(
+            hass,
+            DEFAULT_NAME,
+            forecast_entity_id,
+            charge_hours,
+            discharge_hours,
+            price_delta_percent,
+            min_profit_c_kwh
+        )
     ], True)
-    # async_add_entities(sensors, True)
 
 class PeakSensor(Entity):
     _attr_icon = "mdi:code-array"
@@ -144,50 +148,64 @@ class PeakSensor(Entity):
             name="Zonneplan BMS",
             manufacturer="Zonneplan",
             model="BMS",
-            entry_type="service"
+            entry_type=DeviceEntryType.SERVICE,
         )
 
 DEFAULT_NAME = "Battery Optimizer"
 ICON = "mdi:battery-sync"
 SCAN_INTERVAL = timedelta(minutes=5)
-
-# Default values
-DEFAULT_CHARGE_HOURS = 2
-DEFAULT_DISCHARGE_HOURS = 2
-DEFAULT_RTE_PERCENT = 20.0  # Z: 30% price delta threshold
-DEFAULT_MIN_PROFIT = 6    # Q: 6 Eurocents per kWh minimal profit
+NDOMAIN = "bess_optimizer"
 
 # State definitions
-ACTION_CHARGE = "CHARGE"
-ACTION_DISCHARGE = "DISCHARGE"
-ACTION_STOP = "STOP"
-ACTION_SUPER_DISCHARGE = "SUPER_DISCHARGE"
-ACTION_SELF_CONSUME = "SELF_CONSUMPTION"
+ACTION_CHARGE = "Charge"
+ACTION_DISCHARGE = "Discharge"
+ACTION_STOP = "Stop"
+ACTION_SUPER_DISCHARGE = "Super Discharge"
+ACTION_SELF_CONSUME = "Self Consumption"
+
 
 class BatteryOptimizerSensor(SensorEntity):
     """Representation of the Battery Optimizer Sensor."""
 
-    def __init__(self, hass, name):
+    def __init__(
+        self,
+        hass: HomeAssistant,
+        name: str,
+        forecast_entity_id: str,
+        charge_hours: int,
+        discharge_hours: int,
+        price_delta_percent: float,
+        min_profit_c_kwh: float
+    ):
         """Initialize the sensor."""
         self._hass = hass
         self._name = name
-        self._attr_name = name.replace("_", " ").title()
-        self._attr_unique_id = f"{DOMAIN}_{name}"
-        self._forecast_entity_id = FORECAST_SENSOR
-        self._charge_hours_per_interval = DEFAULT_CHARGE_HOURS
-        self._discharge_hours_per_interval = DEFAULT_DISCHARGE_HOURS
-        self._price_delta_percent = DEFAULT_RTE_PERCENT
+        self._forecast_entity_id = forecast_entity_id
+        self._charge_hours_per_interval = charge_hours
+        self._discharge_hours_per_interval = discharge_hours
+        self._price_delta_percent = price_delta_percent
         # Convert minimal profit from cents/kWh to €/kWh
-        self._min_profit_eur_kwh = DEFAULT_MIN_PROFIT / 100.0
+        self._min_profit_eur_kwh = min_profit_c_kwh / 100.0
         self._state = ACTION_STOP
         self._attributes: Dict[str, Any] = {
             "schedule": [],
             "intervals": 0,
             "min_profit_required_eur_kwh": self._min_profit_eur_kwh,
-            "charge_hours_per_interval": DEFAULT_CHARGE_HOURS,
-            "discharge_hours_per_interval": DEFAULT_DISCHARGE_HOURS,
-            "price_delta_threshold_percent": DEFAULT_RTE_PERCENT,
+            "charge_hours_per_interval": self._charge_hours_per_interval,
+            "discharge_hours_per_interval": self._discharge_hours_per_interval,
+            "price_delta_threshold_percent": self._price_delta_percent,
         }
+
+    @property
+    def device_info(self) -> DeviceInfo:
+        """Return the device info."""
+        return DeviceInfo(
+            identifiers={(NDOMAIN, NDOMAIN)},
+            name=DEFAULT_NAME,
+            manufacturer="Custom BESS Optimization",
+            model="Energy Arbitrage Scheduler",
+            entry_type=DeviceEntryType.SERVICE,
+        )
 
     @property
     def name(self) -> str:
@@ -220,9 +238,13 @@ class BatteryOptimizerSensor(SensorEntity):
         return "measurement"
 
     def _convert_price(self, price_int: int) -> float:
-        """Converts the raw integer price (assumed in µ€/kWh) to €/kWh."""
-        # Assuming the integer is in Microcents per kWh (µ€/kWh)
-        return price_int / 1_000_000.0
+        """
+        Converts the raw integer price to €/kWh.
+        
+        The raw integer is typically in a scaled unit (e.g., deci-micro-euro)
+        and must be divided by 10,000,000.0 to get the price in Euro/kWh (€/kWh).
+        """
+        return price_int / 10_000_000.0
 
     def _calculate_action_schedule(self, forecast_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Main logic to segment and determine the optimal action schedule."""
@@ -401,7 +423,7 @@ class BatteryOptimizerSensor(SensorEntity):
         for hour in schedule:
             try:
                 # Use datetime component to parse the timestamp
-                hour_dt = datetime.parse_datetime(hour['datetime'])
+                hour_dt = datetime.strptime(hour["datetime"], "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
             except ValueError:
                 LOGGER.warning(f"Could not parse datetime: {hour['datetime']}")
                 continue
