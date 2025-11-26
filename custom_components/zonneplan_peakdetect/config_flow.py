@@ -1,4 +1,5 @@
 import voluptuous as vol
+import homeassistant.helpers.config_validation as cv
 
 from homeassistant import config_entries
 from homeassistant.core import callback
@@ -14,25 +15,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
 
         if user_input is not None:
-            # De configuratie opslaan
             return self.async_create_entry(
                 title="Sensor settings", 
                 data=user_input
             )
 
-        # Schema voor het formulier dat de gebruiker te zien krijgt
         data_schema = vol.Schema({
-            # Percentage: type float, met een standaardwaarde
-            vol.Required(
-                CONF_PERCENTAGE, 
-                default=DEFAULT_PERCENTAGE
-            ): int,
-            
-            # Bedrag in Centen: type integer (centen zijn gehele getallen), met een standaardwaarde
-            vol.Required(
-                CONF_CENTS,
-                default=DEFAULT_CENTS
-            ): int,
+            vol.Required(CONF_PERCENTAGE, default=DEFAULT_PERCENTAGE): vol.All(vol.Coerce(float), vol.Range(min=1.0, max=100.0)),
+            vol.Required(CONF_CENTS, default=DEFAULT_CENTS): cv.positive_int,
         })
 
         return self.async_show_form(
