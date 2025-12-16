@@ -284,20 +284,6 @@ class BatteryOptimizerSensor(SensorEntity):
         prices = [item['price_eur_kwh'] for item in prepared_data]
         if not prices:
             return []
-            
-        min_price = min(prices)
-        max_price = max(prices)
-        
-        profit_margin = max_price - min_price
-
-        if profit_margin < self._min_profit_eur_kwh:
-            LOGGER.warning(f"Global profit margin (€{profit_margin:.4f}) is less than minimal profit requirement (€{self._min_profit_eur_kwh:.4f}). Arbitrage suspended.")
-            # Only schedule self-consumption and super-discharge (if applicable)
-            # Find the single most expensive hour for potential SUPER_ONTLADEN
-            super_discharge_hour = max(prepared_data, key=lambda x: x['price_eur_kwh'])
-            super_discharge_hour['action'] = ACTION_SUPER_DISCHARGE
-            return prepared_data
-
 
         # 2. Interval Detection (Z - Price Delta Percentage)
         intervals = []
@@ -347,13 +333,30 @@ class BatteryOptimizerSensor(SensorEntity):
             
         self._attributes['intervals'] = len(intervals)
 
+        # 3.5. Enforce Minimal Profit Margin (Q) Per Interval
+        valid_intervals = []
+        for i, interval in enumerate(intervals):
+            interval_prices = [h['price_eur_kwh'] for h in interval]
+            
+            # This check should ideally not fail if interval detection worked, but included for robustness.
+            if not interval_prices:
+                continue
+
+            interval_min_price = min(interval_prices)
+            interval_max_price = max(interval_prices)
+            interval_profit = interval_max_price - interval_min_price
+
+            if interval_profit >= self._min_profit_eur_kwh:
+                valid_intervals.append(interval)
+            else:
+                LOGGER.debug(f"Interval {i+1} skipped: Profit (€{interval_profit:.4f}) < Required (€{self._min_profit_eur_kwh:.4f}). Arbitrage suspended for this period.")
 
         # 4. Action Assignment (Laden / Ontladen / Super Ontladen)
         
         # Determine global super discharge hour (highest price overall)
         super_discharge_hour = max(prepared_data, key=lambda x: x['price_eur_kwh'])
         
-        for interval in intervals:
+        for interval in valid_intervals:
             # Sort by price for charging and discharging decisions within the interval
             sorted_by_price = sorted(interval, key=lambda x: x['price_eur_kwh'])
             
@@ -369,18 +372,7 @@ class BatteryOptimizerSensor(SensorEntity):
                 slot['action'] = ACTION_CHARGE
                 
             for slot in discharge_slots:
-                # If a slot is both cheapest (charge) AND most expensive (discharge) in a small interval,
-                # prioritize discharge as it usually has a higher profit potential in a given arbitrage cycle.
-                # However, since they are sorted, this is only possible if X+Y > interval length.
-                # We'll prioritize charge if already set, and allow discharge to override if more expensive.
-                if slot['action'] != ACTION_CHARGE:
-                    slot['action'] = ACTION_DISCHARGE
-                else:
-                    # If it's in both top X and top Y (small interval), let's prioritize charge if cheap
-                    # For simplicity, if it's dual-ranked, we'll mark it as DISCHARGE due to higher value.
-                    # This rarely happens in meaningful arbitrage, but needs a tie-breaker.
-                    slot['action'] = ACTION_DISCHARGE 
-
+                slot['action'] = ACTION_DISCHARGE
 
         # 5. Final Pass: Solar / Super Discharge (Overrides Laden/Ontladen if applicable)
         for hour in prepared_data:
