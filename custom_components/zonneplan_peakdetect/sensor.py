@@ -5,7 +5,10 @@ from homeassistant.helpers.entity import Entity
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.const import STATE_ON, STATE_OFF
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+)
 from datetime import datetime, timezone, timedelta
 from .const import DOMAIN, FORECAST_SENSOR, PEAK_SENSOR, LOGGER, CONF_FORECAST_ENTITY, CONF_RTE_PERCENT, CONF_MIN_PROFIT, CONF_CHARGE_HOURS, CONF_DISCHARGE_HOURS
 from homeassistant.helpers.device_registry import DeviceInfo, DeviceEntryType
@@ -48,7 +51,6 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
         ),
         BatteryOptimizerSensor(
             hass,
-            DEFAULT_NAME,
             forecast_entity_id,
             charge_hours,
             discharge_hours,
@@ -161,7 +163,6 @@ class PeakSensor(Entity):
 DEFAULT_NAME = "Battery Optimizer"
 ICON = "mdi:battery-sync"
 SCAN_INTERVAL = timedelta(minutes=5)
-NDOMAIN = "bess_optimizer"
 
 # State definitions
 ACTION_CHARGE = "Charge"
@@ -177,7 +178,6 @@ class BatteryOptimizerSensor(SensorEntity):
     def __init__(
         self,
         hass: HomeAssistant,
-        name: str,
         forecast_entity_id: str,
         charge_hours: int,
         discharge_hours: int,
@@ -186,7 +186,8 @@ class BatteryOptimizerSensor(SensorEntity):
     ):
         """Initialize the sensor."""
         self._hass = hass
-        self._name = name
+        self._sensor_key = "battery_optimizer"
+        self._name = "Battery Optimizer"
         self._forecast_entity_id = forecast_entity_id
         self._charge_hours_per_interval = charge_hours
         self._discharge_hours_per_interval = discharge_hours
@@ -202,12 +203,17 @@ class BatteryOptimizerSensor(SensorEntity):
             "discharge_hours_per_interval": self._discharge_hours_per_interval,
             "price_delta_threshold_percent": self._price_delta_percent,
         }
+    
+    @property
+    def unique_id(self) -> Optional[str]:
+        """Return a unique ID."""
+        return DOMAIN + "_" + self._sensor_key
 
     @property
     def device_info(self) -> DeviceInfo:
         """Return the device info."""
         return DeviceInfo(
-            identifiers={(NDOMAIN, NDOMAIN)},
+            identifiers={(DOMAIN, DOMAIN)},
             name=DEFAULT_NAME,
             manufacturer="Custom BESS Optimization",
             model="Energy Arbitrage Scheduler",
@@ -238,11 +244,6 @@ class BatteryOptimizerSensor(SensorEntity):
     def extra_state_attributes(self) -> Dict[str, Any]:
         """Return the state attributes."""
         return self._attributes
-
-    @property
-    def state_class(self) -> Optional[str]:
-        """Return the state class."""
-        return "measurement"
 
     def _convert_price(self, price_int: int) -> float:
         """

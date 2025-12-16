@@ -1,5 +1,6 @@
+from __future__ import annotations
+from dataclasses import dataclass
 from logging import Logger, getLogger
-
 LOGGER: Logger = getLogger(__package__)
 
 DOMAIN = "zonneplan_peakdetect"
