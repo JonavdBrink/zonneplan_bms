@@ -19,8 +19,8 @@ PLATFORMS: list[Platform] = [
 ]
 
 async def async_setup_entry(
-        hass: HomeAssistant,
-        entry: ZonneplanBmsConfigEntry
+    hass: HomeAssistant,
+    entry: ZonneplanBmsConfigEntry
 ) -> bool:
     """Set up this integration using UI."""
     # Haal de opgeslagen waarden op uit de entry.data dictionary
@@ -47,8 +47,8 @@ async def async_setup_entry(
     return True
 
 async def async_unload_entry(
-        hass: HomeAssistant,
-        entry: ZonneplanBmsConfigEntry
+    hass: HomeAssistant,
+    entry: ZonneplanBmsConfigEntry
 ) -> bool:
     """Handle removal of an entry."""
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)

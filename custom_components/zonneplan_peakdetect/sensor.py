@@ -38,7 +38,14 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     min_profit_c_kwh = config.get(CONF_MIN_PROFIT)
 
     async_add_entities([
-        PeakSensor(hass, PEAK_SENSOR, price_delta_percent, min_profit_c_kwh, charge_hours, discharge_hours),
+        PeakSensor(
+            hass,
+            PEAK_SENSOR,
+            price_delta_percent,
+            min_profit_c_kwh,
+            charge_hours,
+            discharge_hours
+        ),
         BatteryOptimizerSensor(
             hass,
             DEFAULT_NAME,
