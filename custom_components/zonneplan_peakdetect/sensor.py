@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Set up the Battery Optimizer Sensor."""
-    config = hass.data[DOMAIN]
+    config = config_entry.data
     
     forecast_entity_id = config.get(CONF_FORECAST_ENTITY)
     charge_hours = config.get(CONF_CHARGE_HOURS)
@@ -38,7 +38,6 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
 
 DEFAULT_NAME = "Battery Optimizer"
 ICON = "mdi:battery-sync"
-SCAN_INTERVAL = timedelta(minutes=5)
 
 # State definitions
 ACTION_CHARGE = "Charge"
@@ -80,7 +79,7 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
     @property
     def unique_id(self) -> Optional[str]:
         """Return a unique ID."""
-        return DOMAIN + "_" + self._sensor_key
+        return f"{DOMAIN}_{self._sensor_key}"
 
     @property
     def device_info(self) -> DeviceInfo:
@@ -117,11 +116,9 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         """Register listeners when entity is added."""
         await super().async_added_to_hass()
         
-        # Listen for forecast state changes
         self.async_on_remove(
             async_track_state_change_event(self._hass, self._forecast_entity_id, self._handle_forecast_update)
         )
-        # Perform initial calculation
         await self.async_update()
 
     @callback
@@ -143,145 +140,108 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         if not forecast_data:
             return []
 
-        # 1. Price Conversion and Data Preparation
-        prepared_data = []
-        for item in forecast_data:
-            try:
-                price_eur_kwh = self._convert_price(item['electricity_price'])
-                prepared_data.append({
-                    'datetime': item['datetime'],
-                    'price_eur_kwh': price_eur_kwh,
-                    'price_multiplier': 1.0,  # Default multiplier
-                    'action': ACTION_STOP, # Default action
-                    'interval_id': -1,
-                })
-            except KeyError as e:
-                LOGGER.error(f"Missing key in forecast data: {e}")
-                continue
+        # 1. Prepare Data & Global Min for Multiplier
+        prices = [self._convert_price(item['electricity_price']) for item in forecast_data]
         
-        if not prepared_data:
-            return []
-
-        # 2. Interval Detection (Z - Price Delta Percentage)
-        intervals = []
-        current_interval = []
-        interval_id_counter = 0
-        current_min_price = prepared_data[0]['price_eur_kwh']
-        threshold_multiplier = 1 + (self._price_delta_percent / 100.0)
-
-        for i in range(len(prepared_data)):
-            current_data = prepared_data[i]
-            current_price = current_data['price_eur_kwh']
+        prepared_data = []
+        for idx, item in enumerate(forecast_data):
+            price = self._convert_price(item['electricity_price'])
+            running_min = min(prices[:idx + 1])
             
-            # 1. Update minimum price for the current running interval
-            if current_price < current_min_price:
-                current_min_price = current_price
+            prepared_data.append({
+                'datetime': item['datetime'],
+                'price_eur_kwh': price,
+                'price_multiplier': round(price / running_min, 2) if running_min > 0 else round(1.0 + price / abs(running_min), 2),
+                'action': ACTION_STOP,
+                'interval_id': 0,
+                'sort_index': idx
+            })
+
+        # 2. Segment into Waves (Intervals)
+        n = len(prepared_data)
+        current_idx = 0
+        interval_count = 0
+        
+        while current_idx < n - 1:
+            # Step A: Find the NEXT local valley (dip) relative to current position
+            # Walk forward until price stops decreasing
+            valley_idx = current_idx
+            for j in range(current_idx, n - 1):
+                if prices[j+1] > prices[j]:
+                    break
+                valley_idx = j + 1
+
+            # Step B: Find the NEXT local peak (hump) AFTER that specific valley
+            # Walk forward until price stops increasing
+            peak_idx = valley_idx
+            for j in range(valley_idx, n - 1):
+                if prices[j+1] < prices[j]:
+                    break
+                peak_idx = j + 1
             
-            # 2. Check if the price has exceeded the threshold to signal the start of a new peak cycle
-            threshold = current_min_price * threshold_multiplier
+            # Define the current wave segment
+            segment = prepared_data[current_idx : peak_idx + 1]
+            if not segment:
+                current_idx += 1
+                continue
 
-            if current_price > threshold and len(current_interval) > 0:
-                # The current price signals a significant rise, so the previous interval ends here
-                # Finalize the existing interval
-                interval_id_counter += 1
-                for item in current_interval:
-                    item['interval_id'] = interval_id_counter
-                intervals.append(current_interval)
+            seg_min = min(h['price_eur_kwh'] for h in segment)
+            seg_max = max(h['price_eur_kwh'] for h in segment)
+
+            # Process if profit threshold is met
+            if (seg_max - seg_min) >= self._min_profit_eur_kwh:
+                interval_count += 1
                 
-                # Start a new interval with the current data point
-                current_interval = [current_data]
-                current_min_price = current_price # New minimum for the new interval cycle
+                # CHARGE: Select cheapest hours in this specific wave
+                charge_cands = sorted(segment, key=lambda x: (x['price_eur_kwh'], x['sort_index']))
+                charge_slots = charge_cands[:self._charge_hours_per_interval]
+                
+                for s in charge_slots:
+                    s['action'] = ACTION_CHARGE
+                    s['interval_id'] = interval_count
+                
+                # CAUSALITY: Only discharge AFTER the first charge hour of this wave
+                min_charge_idx = min(s['sort_index'] for s in charge_slots)
+                
+                discharge_cands = [
+                    h for h in segment 
+                    if h['sort_index'] > min_charge_idx and h['action'] != ACTION_CHARGE
+                ]
+                discharge_cands.sort(key=lambda x: (-x['price_eur_kwh'], x['sort_index']))
+                
+                for s in discharge_cands[:self._discharge_hours_per_interval]:
+                    s['action'] = ACTION_DISCHARGE
+                    s['interval_id'] = interval_count
             
-            else:
-                # Continue the current interval
-                current_interval.append(current_data)
+            # Move index forward to the end of this wave
+            current_idx = peak_idx + 1
 
-        # Add the last interval
-        if current_interval:
-            interval_id_counter += 1
-            for item in current_interval:
-                item['interval_id'] = interval_id_counter
-            intervals.append(current_interval)
-
-        # 3. Validation & Action Assignment
-        valid_intervals_count = 0
-        for interval in intervals:
-            prices = [h['price_eur_kwh'] for h in interval]
-            if not prices: continue
-
-            i_min = min(prices)
-            i_max = max(prices)
-
-            # Calculate multiplier for every hour in this interval relative to interval low
-            for hour in interval:
-                if i_min == 0:
-                    # Offset by 1 cent (€0.01) to provide a realistic relative ratio
-                    hour['price_multiplier'] = round(hour['price_eur_kwh'] / 0.01, 4)
-                elif i_min > 0:
-                    hour['price_multiplier'] = round(hour['price_eur_kwh'] / i_min, 4)
-                else:
-                    hour['price_multiplier'] = round(1.0 + (hour['price_eur_kwh'] / abs(i_min)), 4)
-                    
-            # Only assign actions if the interval meets the profit requirement
-            if (i_max - i_min) >= self._min_profit_eur_kwh:
-                valid_intervals_count += 1
-                sorted_by_price = sorted(interval, key=lambda x: x['price_eur_kwh'])
-                
-                # Charge slots (cheapest)
-                for slot in sorted_by_price[:self._charge_hours_per_interval]:
-                    slot['action'] = ACTION_CHARGE
-                
-                # Discharge slots (most expensive)
-                # Ensure we don't overwrite charge if interval is very short
-                for slot in sorted_by_price[-self._discharge_hours_per_interval:]:
-                    if slot['action'] != ACTION_CHARGE:
-                        slot['action'] = ACTION_DISCHARGE
-
-        self._attributes['intervals'] = valid_intervals_count        
+        self._attributes['intervals'] = interval_count
+        # Remove helper key before returning
+        for item in prepared_data: item.pop('sort_index', None)
         return prepared_data
 
     async def async_update(self) -> None:
         """Get the latest forecast data and updates the state."""
         LOGGER.debug(f"Updating BESS Optimizer Sensor from {self._forecast_entity_id}")
         
-        forecast_state = self._hass.states.get(self._forecast_entity_id)
+        state = self._hass.states.get(self._forecast_entity_id)
 
-        if not forecast_state:
+        if not state or "forecast" not in state.attributes:
             LOGGER.error(f"Forecast entity {self._forecast_entity_id} not found.")
-            self._state = "Error"
             return
 
-        # The forecast data is usually in the 'forecast' attribute of the source entity
-        forecast_data = forecast_state.attributes.get("forecast")
-        
-        if not isinstance(forecast_data, list):
-            LOGGER.error("Forecast data attribute 'forecast' is missing or not a list.")
-            self._state = "Error"
-            return
+        schedule = self._calculate_action_schedule(state.attributes.get("forecast"))
+        self._attributes['schedule'] = schedule
 
-        # Calculate the new schedule
-        try:
-            schedule = self._calculate_action_schedule(forecast_data)
-            self._attributes['schedule'] = schedule
-        except Exception as e:
-            LOGGER.error(f"Error during schedule calculation: {e}")
-            self._state = "Error"
-            return
-        
-        # Determine the current action based on the nearest future hour
-        now_dt = datetime.now(timezone.utc)
-        current_action = ACTION_STOP
+        if len(schedule) <= 0:
+            self._state = ACTION_STOP
 
-        for hour in schedule:
-            try:
-                # Re-parse to compare with current time
-                h_dt = datetime.strptime(hour["datetime"], "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
-                if h_dt <= now_dt < h_dt + timedelta(hours=1):
-                    current_action = hour['action']
-                    break
-            except ValueError:
-                LOGGER.warning(f"Could not parse datetime: {hour['datetime']}")
-                continue
-        
-        self._state = current_action
+        now = datetime.now(timezone.utc)
+        for i in schedule:
+            dt = datetime.strptime(i["datetime"], "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
+            if dt <= now < dt + timedelta(hours=1):
+                self._state = i['action']
+                break
+
         LOGGER.debug(f"Current BESS action set to: {self._state}")
