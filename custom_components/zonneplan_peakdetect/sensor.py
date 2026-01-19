@@ -164,20 +164,32 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         
         while current_idx < n - 1:
             # Step A: Find the NEXT local valley (dip) relative to current position
-            # Walk forward until price stops decreasing
+            # We track the minimum seen so far. We only 'break' the valley search if 
+            # the price rises significantly (>= min_profit) above the current local minimum.
             valley_idx = current_idx
-            for j in range(current_idx, n - 1):
-                if prices[j+1] > prices[j]:
+            valley_min = prices[current_idx]
+            
+            for j in range(current_idx, n):
+                valley_idx = j
+                if prices[j] < valley_min:
+                    valley_min = prices[j]
+                # Break if price recovers significantly
+                if prices[j] >= (valley_min + self._min_profit_eur_kwh):
                     break
-                valley_idx = j + 1
-
+            
             # Step B: Find the NEXT local peak (hump) AFTER that specific valley
-            # Walk forward until price stops increasing
+            # We track the maximum seen so far. We only 'break' the peak search if
+            # the price drops significantly (>= min_profit) below the current local maximum.
             peak_idx = valley_idx
-            for j in range(valley_idx, n - 1):
-                if prices[j+1] < prices[j]:
+            peak_max = prices[valley_idx]
+            
+            for j in range(valley_idx, n):
+                peak_idx = j
+                if prices[j] > peak_max:
+                    peak_max = prices[j]
+                # Break if price drops significantly (indicating start of next wave)
+                if prices[j] <= (peak_max - self._min_profit_eur_kwh):
                     break
-                peak_idx = j + 1
             
             # Define the current wave segment
             segment = prepared_data[current_idx : peak_idx + 1]
@@ -186,35 +198,35 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                 continue
 
             seg_min = min(h['price_eur_kwh'] for h in segment)
-            seg_max = max(h['price_eur_kwh'] for h in segment)
+            seg_max = max(h['price_eur_kwh'] for h in segment if h['sort_index'] >= valley_idx)
 
             # Process if profit threshold is met
             if (seg_max - seg_min) >= self._min_profit_eur_kwh:
                 interval_count += 1
                 
                 # CHARGE: Select cheapest hours in this specific wave
-                charge_cands = sorted(segment, key=lambda x: (x['price_eur_kwh'], x['sort_index']))
+                charge_cands = [h for h in segment if h['sort_index'] < valley_idx ]
+                charge_cands.sort(key=lambda x: (x['price_eur_kwh'], x['sort_index']))
+                if not charge_cands:
+                    break
                 charge_slots = charge_cands[:self._charge_hours_per_interval]
+                                
+                discharge_cands = [h for h in segment if h['sort_index'] >= valley_idx]
+                discharge_cands.sort(key=lambda x: (-x['price_eur_kwh'], x['sort_index']))
+                if not discharge_cands:
+                    break
+                discharge_slots = discharge_cands[:self._discharge_hours_per_interval]
                 
                 for s in charge_slots:
                     s['action'] = ACTION_CHARGE
                     s['interval_id'] = interval_count
-                
-                # CAUSALITY: Only discharge AFTER the first charge hour of this wave
-                min_charge_idx = min(s['sort_index'] for s in charge_slots)
-                
-                discharge_cands = [
-                    h for h in segment 
-                    if h['sort_index'] > min_charge_idx and h['action'] != ACTION_CHARGE
-                ]
-                discharge_cands.sort(key=lambda x: (-x['price_eur_kwh'], x['sort_index']))
-                
-                for s in discharge_cands[:self._discharge_hours_per_interval]:
+                                
+                for s in discharge_slots:
                     s['action'] = ACTION_DISCHARGE
                     s['interval_id'] = interval_count
             
             # Move index forward to the end of this wave
-            current_idx = peak_idx + 1
+            current_idx = peak_idx
 
         self._attributes['intervals'] = interval_count
         # Remove helper key before returning
