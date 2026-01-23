@@ -143,23 +143,28 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         # 1. Prepare Data & Global Min for Multiplier
         prices = [self._convert_price(item['electricity_price']) for item in forecast_data]
         
+        now = datetime.now(timezone.utc)
         prepared_data = []
+        offset_idx = 0
         for idx, item in enumerate(forecast_data):
             price = self._convert_price(item['electricity_price'])
             running_min = min(prices[:idx + 1])
             
+            is_passed = datetime.strptime(item["datetime"], "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc) < now
+            if is_passed:
+                offset_idx = idx
             prepared_data.append({
                 'datetime': item['datetime'],
                 'price_eur_kwh': price,
                 'price_multiplier': round(price / running_min, 2) if running_min > 0 else round(1.0 + price / abs(running_min), 2),
                 'action': ACTION_STOP,
-                'interval_id': 0,
+                'interval_id': -1 if is_passed else 0,
                 'sort_index': idx
             })
 
         # 2. Segment into Waves (Intervals)
         n = len(prepared_data)
-        current_idx = 0
+        current_idx = offset_idx
         interval_count = 0
         
         while current_idx < n - 1:
@@ -217,13 +222,14 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                     break
                 discharge_slots = discharge_cands[:self._discharge_hours_per_interval]
                 
+                for s in segment:
+                    s['interval_id'] = interval_count
+
                 for s in charge_slots:
                     s['action'] = ACTION_CHARGE
-                    s['interval_id'] = interval_count
                                 
                 for s in discharge_slots:
                     s['action'] = ACTION_DISCHARGE
-                    s['interval_id'] = interval_count
             
             # Move index forward to the end of this wave
             current_idx = peak_idx
