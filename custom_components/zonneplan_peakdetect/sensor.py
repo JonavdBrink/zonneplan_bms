@@ -151,8 +151,8 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
             running_min = min(prices[:idx + 1])
             
             is_passed = datetime.strptime(item["datetime"], "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc) < now
-            if is_passed:
-                offset_idx = idx
+            # if is_passed:
+            #     offset_idx = idx
             prepared_data.append({
                 'datetime': item['datetime'],
                 'price_eur_kwh': price,
@@ -202,24 +202,21 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                 current_idx += 1
                 continue
 
-            seg_min = min(h['price_eur_kwh'] for h in segment)
-            seg_max = max(h['price_eur_kwh'] for h in segment if h['sort_index'] >= valley_idx)
-
             # Process if profit threshold is met
-            if (seg_max - seg_min) >= self._min_profit_eur_kwh:
-                interval_count += 1
-                
+            if (peak_max - valley_min) >= self._min_profit_eur_kwh:                
                 # CHARGE: Select cheapest hours in this specific wave
-                charge_cands = [h for h in segment if h['sort_index'] < valley_idx ]
-                charge_cands.sort(key=lambda x: (x['price_eur_kwh'], x['sort_index']))
+                charge_cands = [h for h in segment if h['sort_index'] < valley_idx and peak_max - h['price_eur_kwh'] > self._min_profit_eur_kwh ]
+                charge_cands.sort(key=lambda x: x['price_eur_kwh'])
                 if not charge_cands:
-                    break
+                    current_idx = peak_idx
+                    continue
                 charge_slots = charge_cands[:self._charge_hours_per_interval]
                                 
-                discharge_cands = [h for h in segment if h['sort_index'] >= valley_idx]
-                discharge_cands.sort(key=lambda x: (-x['price_eur_kwh'], x['sort_index']))
+                discharge_cands = [h for h in segment if h['sort_index'] >= valley_idx and h['price_eur_kwh'] - valley_min > self._min_profit_eur_kwh]
+                discharge_cands.sort(key=lambda x: x['price_eur_kwh'], reverse=True)
                 if not discharge_cands:
-                    break
+                    current_idx = peak_idx
+                    continue
                 discharge_slots = discharge_cands[:self._discharge_hours_per_interval]
                 
                 for s in segment:
@@ -230,6 +227,8 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                                 
                 for s in discharge_slots:
                     s['action'] = ACTION_DISCHARGE
+                
+                interval_count += 1
             
             # Move index forward to the end of this wave
             current_idx = peak_idx
