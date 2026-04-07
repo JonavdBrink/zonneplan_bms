@@ -218,7 +218,8 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                     current_idx = peak_idx
                     continue
                 discharge_slots = discharge_cands[:self._discharge_hours_per_interval]
-                
+                charge_slots = charge_slots[:len(discharge_slots)]
+
                 for s in segment:
                     s['interval_id'] = interval_count
 
