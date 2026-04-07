@@ -1,19 +1,29 @@
-from typing import Any, Dict, Optional, List
 
-from homeassistant.helpers.entity import Entity
-# from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from homeassistant.helpers.event import async_track_state_change_event
-from homeassistant.core import HomeAssistant, callback
+from __future__ import annotations
+
+from datetime import timedelta
+from typing import Any
+
 from homeassistant.components.sensor import SensorEntity
+from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
+from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.restore_state import RestoreEntity
-from homeassistant.helpers.device_registry import DeviceInfo, DeviceEntryType
-from datetime import datetime, timezone, timedelta
-from .const import DOMAIN, LOGGER, CONF_FORECAST_ENTITY, CONF_RTE_PERCENT, CONF_MIN_PROFIT, CONF_CHARGE_HOURS, CONF_DISCHARGE_HOURS
+from homeassistant.util import dt as dt_util
 
-import json
+from .const import (
+    ACTION_CHARGE,
+    ACTION_DISCHARGE,
+    ACTION_STOP,
+    CONF_CHARGE_HOURS,
+    CONF_DISCHARGE_HOURS,
+    CONF_FORECAST_ENTITY,
+    CONF_MIN_PROFIT,
+    CONF_RTE_PERCENT,
+    DOMAIN,
+    LOGGER,
+)
 
-from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Set up the Battery Optimizer Sensor."""
@@ -27,7 +37,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
 
     async_add_entities([
         BatteryOptimizerSensor(
-            hass,
+            config_entry.entry_id,
             forecast_entity_id,
             charge_hours,
             discharge_hours,
@@ -39,17 +49,16 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
 DEFAULT_NAME = "Battery Optimizer"
 ICON = "mdi:battery-sync"
 
-# State definitions
-ACTION_CHARGE = "Charge"
-ACTION_DISCHARGE = "Discharge"
-ACTION_STOP = "Stop"
-
 class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
     """Representation of the Battery Optimizer Sensor."""
 
+    _attr_icon = ICON
+    _attr_has_entity_name = True
+    _attr_name = "Battery Optimizer"
+
     def __init__(
         self,
-        hass: HomeAssistant,
+        entry_id: str,
         forecast_entity_id: str,
         charge_hours: int,
         discharge_hours: int,
@@ -57,17 +66,15 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         min_profit_c_kwh: float
     ):
         """Initialize the sensor."""
-        self._hass = hass
-        self._sensor_key = "battery_optimizer"
-        self._name = "Battery Optimizer"
+        self._attr_unique_id = f"{entry_id}_battery_optimizer"
         self._forecast_entity_id = forecast_entity_id
         self._charge_hours_per_interval = charge_hours
         self._discharge_hours_per_interval = discharge_hours
         self._price_delta_percent = price_delta_percent
         # Convert minimal profit from cents/kWh to €/kWh
         self._min_profit_eur_kwh = min_profit_c_kwh / 100.0
-        self._state = ACTION_STOP
-        self._attributes: Dict[str, Any] = {
+        self._attr_native_value = ACTION_STOP
+        self._attr_extra_state_attributes: dict[str, Any] = {
             "schedule": [],
             "intervals": 0,
             "min_profit_required_eur_kwh": self._min_profit_eur_kwh,
@@ -75,49 +82,20 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
             "discharge_hours_per_interval": self._discharge_hours_per_interval,
             "price_delta_threshold_percent": self._price_delta_percent,
         }
-    
-    @property
-    def unique_id(self) -> Optional[str]:
-        """Return a unique ID."""
-        return f"{DOMAIN}_{self._sensor_key}"
-
-    @property
-    def device_info(self) -> DeviceInfo:
-        """Return the device info."""
-        return DeviceInfo(
-            identifiers={(DOMAIN, DOMAIN)},
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, entry_id)},
             name=DEFAULT_NAME,
             manufacturer="Custom BESS Optimization",
             model="Energy Arbitrage Scheduler",
             entry_type=DeviceEntryType.SERVICE,
         )
-
-    @property
-    def name(self) -> str:
-        """Return the name of the sensor."""
-        return self._name
-
-    @property
-    def state(self) -> str:
-        """Return the state of the sensor (current action)."""
-        return self._state
-
-    @property
-    def icon(self) -> str:
-        """Return the icon to use in the frontend."""
-        return ICON
-
-    @property
-    def extra_state_attributes(self) -> Dict[str, Any]:
-        """Return the state attributes."""
-        return self._attributes
     
     async def async_added_to_hass(self):
         """Register listeners when entity is added."""
         await super().async_added_to_hass()
         
         self.async_on_remove(
-            async_track_state_change_event(self._hass, self._forecast_entity_id, self._handle_forecast_update)
+            async_track_state_change_event(self.hass, self._forecast_entity_id, self._handle_forecast_update)
         )
         await self.async_update()
 
@@ -143,14 +121,15 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         # 1. Prepare Data & Global Min for Multiplier
         prices = [self._convert_price(item['electricity_price']) for item in forecast_data]
         
-        now = datetime.now(timezone.utc)
+        now = dt_util.now()
         prepared_data = []
         offset_idx = 0
         for idx, item in enumerate(forecast_data):
             price = self._convert_price(item['electricity_price'])
             running_min = min(prices[:idx + 1])
             
-            is_passed = datetime.strptime(item["datetime"], "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc) < now
+            dt = dt_util.parse_datetime(item["datetime"])
+            is_passed = dt < now if dt else False
             # if is_passed:
             #     offset_idx = idx
             prepared_data.append({
@@ -218,7 +197,11 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                     current_idx = peak_idx
                     continue
                 discharge_slots = discharge_cands[:self._discharge_hours_per_interval]
-                charge_slots = charge_slots[:len(discharge_slots)]
+
+                # Balance charge and discharge slots
+                num_slots = min(len(charge_slots), len(discharge_slots))
+                charge_slots = charge_slots[:num_slots]
+                discharge_slots = discharge_slots[:num_slots]
 
                 for s in segment:
                     s['interval_id'] = interval_count
@@ -234,7 +217,7 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
             # Move index forward to the end of this wave
             current_idx = peak_idx
 
-        self._attributes['intervals'] = interval_count
+        self._attr_extra_state_attributes['intervals'] = interval_count
         # Remove helper key before returning
         for item in prepared_data: item.pop('sort_index', None)
         return prepared_data
@@ -243,23 +226,23 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         """Get the latest forecast data and updates the state."""
         LOGGER.debug(f"Updating BESS Optimizer Sensor from {self._forecast_entity_id}")
         
-        state = self._hass.states.get(self._forecast_entity_id)
+        state = self.hass.states.get(self._forecast_entity_id)
 
         if not state or "forecast" not in state.attributes:
             LOGGER.error(f"Forecast entity {self._forecast_entity_id} not found.")
             return
 
         schedule = self._calculate_action_schedule(state.attributes.get("forecast"))
-        self._attributes['schedule'] = schedule
+        self._attr_extra_state_attributes['schedule'] = schedule
 
         if len(schedule) <= 0:
-            self._state = ACTION_STOP
+            self._attr_native_value = ACTION_STOP
 
-        now = datetime.now(timezone.utc)
+        now = dt_util.now()
         for i in schedule:
-            dt = datetime.strptime(i["datetime"], "%Y-%m-%dT%H:%M:%S.%fZ").replace(tzinfo=timezone.utc)
-            if dt <= now < dt + timedelta(hours=1):
-                self._state = i['action']
+            dt = dt_util.parse_datetime(i["datetime"])
+            if dt and dt <= now < dt + timedelta(hours=1):
+                self._attr_native_value = i['action']
                 break
 
-        LOGGER.debug(f"Current BESS action set to: {self._state}")
+        LOGGER.debug(f"Current BESS action set to: {self._attr_native_value}")

@@ -20,3 +20,8 @@ DEFAULT_CENTS = 6
 DEFAULT_CHARGE_HOURS = 2
 DEFAULT_DISCHARGE_HOURS = 2
 DEFAULT_FORECAST_ENTITY = "sensor.zonneplan_current_electricity_tariff"
+
+# State definitions
+ACTION_CHARGE = "Charge"
+ACTION_DISCHARGE = "Discharge"
+ACTION_STOP = "Stop"
