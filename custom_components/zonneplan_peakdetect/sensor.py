@@ -25,7 +25,7 @@ from .const import (
 )
 
 SENSOR_DESCRIPTION = SensorEntityDescription(
-    key="battery_optimizer",
+    key="Action",
     name="Battery Optimizer",
     icon="mdi:battery-sync",
 )
@@ -72,6 +72,7 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         """Initialize the sensor."""
         self.entity_description = description
         self._attr_unique_id = f"{entry_id}_{description.key}"
+        self._attr_name = description.key
         self._forecast_entity_id = forecast_entity_id
         self._charge_hours_per_interval = charge_hours
         self._discharge_hours_per_interval = discharge_hours
