@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import timedelta
 from typing import Any
 
-from homeassistant.components.sensor import SensorEntity
+from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.event import async_track_state_change_event
@@ -24,8 +24,14 @@ from .const import (
     LOGGER,
 )
 
+SENSOR_DESCRIPTION = SensorEntityDescription(
+    key="battery_optimizer",
+    name="Battery Optimizer",
+    icon="mdi:battery-sync",
+)
 
-async def async_setup_entry(hass, config_entry, async_add_entities):
+
+async def async_setup_entry(hass: HomeAssistant, config_entry: Any, async_add_entities: Any) -> None:
     """Set up the Battery Optimizer Sensor."""
     config = config_entry.data
     
@@ -42,19 +48,16 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
             charge_hours,
             discharge_hours,
             price_delta_percent,
-            min_profit_c_kwh
+            min_profit_c_kwh,
+            SENSOR_DESCRIPTION
         )
     ], True)
 
-DEFAULT_NAME = "Battery Optimizer"
-ICON = "mdi:battery-sync"
 
 class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
     """Representation of the Battery Optimizer Sensor."""
 
-    _attr_icon = ICON
     _attr_has_entity_name = True
-    _attr_name = "Battery Optimizer"
 
     def __init__(
         self,
@@ -63,10 +66,12 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         charge_hours: int,
         discharge_hours: int,
         price_delta_percent: float,
-        min_profit_c_kwh: float
-    ):
+        min_profit_c_kwh: float,
+        description: SensorEntityDescription
+    ) -> None:
         """Initialize the sensor."""
-        self._attr_unique_id = f"{entry_id}_battery_optimizer"
+        self.entity_description = description
+        self._attr_unique_id = f"{entry_id}_{description.key}"
         self._forecast_entity_id = forecast_entity_id
         self._charge_hours_per_interval = charge_hours
         self._discharge_hours_per_interval = discharge_hours
@@ -84,13 +89,13 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         }
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry_id)},
-            name=DEFAULT_NAME,
+            name=description.name,
             manufacturer="Custom BESS Optimization",
             model="Energy Arbitrage Scheduler",
             entry_type=DeviceEntryType.SERVICE,
         )
     
-    async def async_added_to_hass(self):
+    async def async_added_to_hass(self) -> None:
         """Register listeners when entity is added."""
         await super().async_added_to_hass()
         
@@ -100,7 +105,7 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         await self.async_update()
 
     @callback
-    def _handle_forecast_update(self, event):
+    def _handle_forecast_update(self, event: Any) -> None:
         """Callback to force recalculation when forecast sensor changes."""
         self.async_schedule_update_ha_state(force_refresh=True)
 
@@ -113,37 +118,43 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         """
         return price_int / 10_000_000.0
 
-    def _calculate_action_schedule(self, forecast_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    def _calculate_action_schedule(self, forecast_data: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Main logic to segment and determine the optimal action schedule."""
         if not forecast_data:
             return []
-
-        # 1. Prepare Data & Global Min for Multiplier
-        prices = [self._convert_price(item['electricity_price']) for item in forecast_data]
         
+        # 1. Prepare Data
         now = dt_util.now()
         prepared_data = []
-        offset_idx = 0
+        running_min = float('inf')
         for idx, item in enumerate(forecast_data):
-            price = self._convert_price(item['electricity_price'])
-            running_min = min(prices[:idx + 1])
+            raw_price = item.get('electricity_price')
+            raw_dt = item.get('datetime')
             
-            dt = dt_util.parse_datetime(item["datetime"])
+            if raw_price is None or raw_dt is None:
+                LOGGER.warning("Incomplete forecast data at index %d: %s", idx, item)
+                continue
+                
+            price = self._convert_price(raw_price)
+            if price < running_min:
+                running_min = price
+            
+            dt = dt_util.parse_datetime(raw_dt)
             is_passed = dt < now if dt else False
-            # if is_passed:
-            #     offset_idx = idx
+
             prepared_data.append({
-                'datetime': item['datetime'],
+                'datetime': raw_dt,
                 'price_eur_kwh': price,
-                'price_multiplier': round(price / running_min, 2) if running_min > 0 else round(1.0 + price / abs(running_min), 2),
+                'price_multiplier': round(price / running_min, 2) if running_min > 0 else round(1.0 + price / abs(running_min), 2) if running_min != 0 else 1.0,
                 'action': ACTION_STOP,
                 'interval_id': -1 if is_passed else 0,
                 'sort_index': idx
             })
 
         # 2. Segment into Waves (Intervals)
+        prices = [item['price_eur_kwh'] for item in prepared_data]
         n = len(prepared_data)
-        current_idx = offset_idx
+        current_idx = 0
         interval_count = 0
         
         while current_idx < n - 1:
@@ -183,7 +194,7 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
 
             # Process if profit threshold is met
             if (peak_max - valley_min) >= self._min_profit_eur_kwh:                
-                # CHARGE: Select cheapest hours in this specific wave
+                # CHARGE: Select cheapest hours in this wave before the valley
                 charge_cands = [h for h in segment if h['sort_index'] < valley_idx and peak_max - h['price_eur_kwh'] > self._min_profit_eur_kwh ]
                 charge_cands.sort(key=lambda x: x['price_eur_kwh'])
                 if not charge_cands:
@@ -191,6 +202,7 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                     continue
                 charge_slots = charge_cands[:self._charge_hours_per_interval]
                                 
+                # DISCHARGE: Select most expensive hours in this wave after the valley
                 discharge_cands = [h for h in segment if h['sort_index'] >= valley_idx and h['price_eur_kwh'] - valley_min > self._min_profit_eur_kwh]
                 discharge_cands.sort(key=lambda x: x['price_eur_kwh'], reverse=True)
                 if not discharge_cands:
@@ -223,13 +235,13 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         return prepared_data
 
     async def async_update(self) -> None:
-        """Get the latest forecast data and updates the state."""
-        LOGGER.debug(f"Updating BESS Optimizer Sensor from {self._forecast_entity_id}")
+        """Get the latest forecast data and update the state."""
+        LOGGER.debug("Updating BESS Optimizer Sensor from %s", self._forecast_entity_id)
         
         state = self.hass.states.get(self._forecast_entity_id)
 
         if not state or "forecast" not in state.attributes:
-            LOGGER.error(f"Forecast entity {self._forecast_entity_id} not found.")
+            LOGGER.warning("Forecast entity %s or its forecast attribute not found", self._forecast_entity_id)
             return
 
         schedule = self._calculate_action_schedule(state.attributes.get("forecast"))
@@ -245,4 +257,4 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                 self._attr_native_value = i['action']
                 break
 
-        LOGGER.debug(f"Current BESS action set to: {self._attr_native_value}")
+        LOGGER.debug("Current BESS action set to: %s", self._attr_native_value)
