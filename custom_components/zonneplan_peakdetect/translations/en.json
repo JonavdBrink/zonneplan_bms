@@ -4,7 +4,25 @@
     "step": {
       "user": {
         "title": "Configure Zonneplan Peak Detection",
-        "description": "No options required."
+        "data": {
+          "price_delta_percent": "Price delta threshold percentage",
+          "min_profit_c_kwh": "Minimum profit required (cents/kWh)",
+          "charge_quarters": "Charge quarters (15-min intervals)",
+          "discharge_quarters": "Discharge quarters (15-min intervals)",
+          "forecast_entity": "Price forecast entity ID"
+        },
+        "description": "Enter the configuration values for the sensor."
+      },
+      "reconfigure": {
+        "title": "Reconfigure Zonneplan Peak Detection",
+        "data": {
+          "price_delta_percent": "Price delta threshold percentage",
+          "min_profit_c_kwh": "Minimum profit required (cents/kWh)",
+          "charge_quarters": "Charge quarters (15-min intervals)",
+          "discharge_quarters": "Discharge quarters (15-min intervals)",
+          "forecast_entity": "Price forecast entity ID"
+        },
+        "description": "Adjust the configuration values for the sensor."
       }
     }
   }

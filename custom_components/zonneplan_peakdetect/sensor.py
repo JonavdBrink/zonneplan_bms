@@ -1,7 +1,7 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 
 from homeassistant.components.sensor import SensorEntity, SensorEntityDescription
@@ -15,8 +15,8 @@ from .const import (
     ACTION_CHARGE,
     ACTION_DISCHARGE,
     ACTION_STOP,
-    CONF_CHARGE_HOURS,
-    CONF_DISCHARGE_HOURS,
+    CONF_CHARGE_QUARTERS,
+    CONF_DISCHARGE_QUARTERS,
     CONF_FORECAST_ENTITY,
     CONF_MIN_PROFIT,
     CONF_RTE_PERCENT,
@@ -36,8 +36,16 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: Any, async_add_en
     config = config_entry.data
     
     forecast_entity_id = config.get(CONF_FORECAST_ENTITY)
-    charge_hours = config.get(CONF_CHARGE_HOURS)
-    discharge_hours = config.get(CONF_DISCHARGE_HOURS)
+    
+    # Backwards compatibility fallback from charge_hours to charge_quarters
+    charge_quarters = config.get(CONF_CHARGE_QUARTERS)
+    if charge_quarters is None:
+        charge_quarters = config.get("charge_hours", 2) * 4
+
+    discharge_quarters = config.get(CONF_DISCHARGE_QUARTERS)
+    if discharge_quarters is None:
+        discharge_quarters = config.get("discharge_hours", 2) * 4
+
     price_delta_percent = config.get(CONF_RTE_PERCENT)
     min_profit_c_kwh = config.get(CONF_MIN_PROFIT)
 
@@ -45,13 +53,22 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: Any, async_add_en
         BatteryOptimizerSensor(
             config_entry.entry_id,
             forecast_entity_id,
-            charge_hours,
-            discharge_hours,
+            charge_quarters,
+            discharge_quarters,
             price_delta_percent,
             min_profit_c_kwh,
             SENSOR_DESCRIPTION
         )
     ], True)
+
+
+def _parse_datetime(val: Any) -> datetime | None:
+    """Safely parse a datetime object or string."""
+    if isinstance(val, datetime):
+        return val
+    if isinstance(val, str):
+        return dt_util.parse_datetime(val)
+    return None
 
 
 class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
@@ -63,8 +80,8 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         self,
         entry_id: str,
         forecast_entity_id: str,
-        charge_hours: int,
-        discharge_hours: int,
+        charge_quarters: int,
+        discharge_quarters: int,
         price_delta_percent: float,
         min_profit_c_kwh: float,
         description: SensorEntityDescription
@@ -74,8 +91,8 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         self._attr_unique_id = f"{entry_id}_{description.key}"
         self._attr_name = description.key
         self._forecast_entity_id = forecast_entity_id
-        self._charge_hours_per_interval = charge_hours
-        self._discharge_hours_per_interval = discharge_hours
+        self._charge_quarters = charge_quarters
+        self._discharge_quarters = discharge_quarters
         self._price_delta_percent = price_delta_percent
         # Convert minimal profit from cents/kWh to €/kWh
         self._min_profit_eur_kwh = min_profit_c_kwh / 100.0
@@ -84,8 +101,8 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
             "schedule": [],
             "intervals": 0,
             "min_profit_required_eur_kwh": self._min_profit_eur_kwh,
-            "charge_hours_per_interval": self._charge_hours_per_interval,
-            "discharge_hours_per_interval": self._discharge_hours_per_interval,
+            "charge_quarters": self._charge_quarters,
+            "discharge_quarters": self._discharge_quarters,
             "price_delta_threshold_percent": self._price_delta_percent,
         }
         self._attr_device_info = DeviceInfo(
@@ -140,7 +157,7 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
             if price < running_min:
                 running_min = price
             
-            dt = dt_util.parse_datetime(raw_dt)
+            dt = _parse_datetime(raw_dt)
             is_passed = dt < now if dt else False
 
             prepared_data.append({
@@ -152,7 +169,27 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                 'sort_index': idx
             })
 
-        # 2. Segment into Waves (Intervals)
+        # 2. Determine interval duration and slot counts from configured quarters
+        interval_minutes = 60
+        if len(prepared_data) > 1:
+            dt1 = _parse_datetime(prepared_data[0]['datetime'])
+            dt2 = _parse_datetime(prepared_data[1]['datetime'])
+            if dt1 and dt2:
+                diff = (dt2 - dt1).total_seconds() / 60.0
+                if diff > 0:
+                    interval_minutes = int(diff)
+
+        if self._charge_quarters > 0:
+            charge_slots_count = max(1, int(round(self._charge_quarters * 15.0 / interval_minutes)))
+        else:
+            charge_slots_count = 0
+
+        if self._discharge_quarters > 0:
+            discharge_slots_count = max(1, int(round(self._discharge_quarters * 15.0 / interval_minutes)))
+        else:
+            discharge_slots_count = 0
+
+        # 3. Segment into Waves (Intervals)
         prices = [item['price_eur_kwh'] for item in prepared_data]
         n = len(prepared_data)
         current_idx = 0
@@ -201,7 +238,7 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                 if not charge_cands:
                     current_idx = peak_idx
                     continue
-                charge_slots = charge_cands[:self._charge_hours_per_interval]
+                charge_slots = charge_cands[:charge_slots_count]
                                 
                 # DISCHARGE: Select most expensive hours in this wave after the valley
                 discharge_cands = [h for h in segment if h['sort_index'] >= valley_idx and h['price_eur_kwh'] - valley_min > self._min_profit_eur_kwh]
@@ -209,7 +246,7 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                 if not discharge_cands:
                     current_idx = peak_idx
                     continue
-                discharge_slots = discharge_cands[:self._discharge_hours_per_interval]
+                discharge_slots = discharge_cands[:discharge_slots_count]
 
                 # Balance charge and discharge slots
                 num_slots = min(len(charge_slots), len(discharge_slots))
@@ -252,9 +289,18 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
             self._attr_native_value = ACTION_STOP
 
         now = dt_util.now()
+        interval_minutes = 60
+        if len(schedule) > 1:
+            dt1 = _parse_datetime(schedule[0]["datetime"])
+            dt2 = _parse_datetime(schedule[1]["datetime"])
+            if dt1 and dt2:
+                diff = (dt2 - dt1).total_seconds() / 60.0
+                if diff > 0:
+                    interval_minutes = int(diff)
+
         for i in schedule:
-            dt = dt_util.parse_datetime(i["datetime"])
-            if dt and dt <= now < dt + timedelta(hours=1):
+            dt = _parse_datetime(i["datetime"])
+            if dt and dt <= now < dt + timedelta(minutes=interval_minutes):
                 self._attr_native_value = i['action']
                 break
 

@@ -10,14 +10,14 @@ from homeassistant.data_entry_flow import FlowResult
 import homeassistant.helpers.config_validation as cv
 
 from .const import (
-    CONF_CHARGE_HOURS,
-    CONF_DISCHARGE_HOURS,
+    CONF_CHARGE_QUARTERS,
+    CONF_DISCHARGE_QUARTERS,
     CONF_FORECAST_ENTITY,
     CONF_MIN_PROFIT,
     CONF_RTE_PERCENT,
     DEFAULT_CENTS,
-    DEFAULT_CHARGE_HOURS,
-    DEFAULT_DISCHARGE_HOURS,
+    DEFAULT_CHARGE_QUARTERS,
+    DEFAULT_DISCHARGE_QUARTERS,
     DEFAULT_FORECAST_ENTITY,
     DEFAULT_PERCENTAGE,
     DOMAIN,
@@ -33,6 +33,20 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is None:
             user_input = {}
 
+        charge_default = user_input.get(CONF_CHARGE_QUARTERS)
+        if charge_default is None:
+            if "charge_hours" in user_input:
+                charge_default = user_input["charge_hours"] * 4
+            else:
+                charge_default = DEFAULT_CHARGE_QUARTERS
+
+        discharge_default = user_input.get(CONF_DISCHARGE_QUARTERS)
+        if discharge_default is None:
+            if "discharge_hours" in user_input:
+                discharge_default = user_input["discharge_hours"] * 4
+            else:
+                discharge_default = DEFAULT_DISCHARGE_QUARTERS
+
         return vol.Schema({
             vol.Required(
                 CONF_RTE_PERCENT, 
@@ -43,12 +57,12 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 default=user_input.get(CONF_MIN_PROFIT, DEFAULT_CENTS)
             ): cv.positive_int,
             vol.Required(
-                CONF_CHARGE_HOURS, 
-                default=user_input.get(CONF_CHARGE_HOURS, DEFAULT_CHARGE_HOURS)
+                CONF_CHARGE_QUARTERS, 
+                default=charge_default
             ): cv.positive_int,
             vol.Required(
-                CONF_DISCHARGE_HOURS, 
-                default=user_input.get(CONF_DISCHARGE_HOURS, DEFAULT_DISCHARGE_HOURS)
+                CONF_DISCHARGE_QUARTERS, 
+                default=discharge_default
             ): cv.positive_int,
             vol.Required(
                 CONF_FORECAST_ENTITY, 

@@ -4,7 +4,25 @@
     "step": {
       "user": {
         "title": "Configureer Zonneplan Peak Detection",
-        "description": "Geen opties vereist."
+        "data": {
+          "price_delta_percent": "Prijsverschil drempelpercentage",
+          "min_profit_c_kwh": "Minimaal vereiste winst (cent/kWh)",
+          "charge_quarters": "Laad kwartieren (15-min intervallen)",
+          "discharge_quarters": "Ontlaad kwartieren (15-min intervallen)",
+          "forecast_entity": "Prijssensor entiteit ID"
+        },
+        "description": "Voer de configuratiewaarden voor de sensor in."
+      },
+      "reconfigure": {
+        "title": "Configureer Zonneplan Peak Detection opnieuw",
+        "data": {
+          "price_delta_percent": "Prijsverschil drempelpercentage",
+          "min_profit_c_kwh": "Minimaal vereiste winst (cent/kWh)",
+          "charge_quarters": "Laad kwartieren (15-min intervallen)",
+          "discharge_quarters": "Ontlaad kwartieren (15-min intervallen)",
+          "forecast_entity": "Prijssensor entiteit ID"
+        },
+        "description": "Pas de configuratiewaarden voor de sensor aan."
       }
     }
   }
