@@ -5,7 +5,7 @@ LOGGER: Logger = getLogger(__package__)
 
 DOMAIN = "zonneplan_peakdetect"
 PEAK_SENSOR = "zonneplan_peak_hour"
-FORECAST_SENSOR = "sensor.zonneplan_current_electricity_tariff"
+FORECAST_SENSOR = "sensor.zonneplan_current_quarter_hourly_electricity_tariff"
 
 # Configuratiesleutels
 CONF_CHARGE_HOURS = "charge_hours"  # Deprecated, fallback only
@@ -23,7 +23,7 @@ DEFAULT_CHARGE_HOURS = 2  # Deprecated, fallback only
 DEFAULT_DISCHARGE_HOURS = 2  # Deprecated, fallback only
 DEFAULT_CHARGE_QUARTERS = 8
 DEFAULT_DISCHARGE_QUARTERS = 8
-DEFAULT_FORECAST_ENTITY = "sensor.zonneplan_current_electricity_tariff"
+DEFAULT_FORECAST_ENTITY = "sensor.zonneplan_current_quarter_hourly_electricity_tariff"
 
 # State definitions
 ACTION_CHARGE = "Charge"

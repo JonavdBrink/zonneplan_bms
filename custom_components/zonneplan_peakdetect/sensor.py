@@ -146,8 +146,17 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         prepared_data = []
         running_min = float('inf')
         for idx, item in enumerate(forecast_data):
-            raw_price = item.get('electricity_price')
-            raw_dt = item.get('datetime')
+            # Backwards-compatible format extraction (supporting both old and new schema)
+            raw_dt = item.get('start_date')
+            if raw_dt is None:
+                raw_dt = item.get('datetime')
+
+            raw_price = None
+            price_tax_included = item.get('price_tax_included')
+            if isinstance(price_tax_included, dict):
+                raw_price = price_tax_included.get('amount')
+            if raw_price is None:
+                raw_price = item.get('electricity_price')
             
             if raw_price is None or raw_dt is None:
                 LOGGER.warning("Incomplete forecast data at index %d: %s", idx, item)
