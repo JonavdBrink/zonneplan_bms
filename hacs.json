@@ -1,6 +1,6 @@
 {
-  "name": "Zonneplan Peak Detect",
-  "homeassistant": "2025.10.1",
+  "name": "Zonneplan Battery Optimizer",
+  "homeassistant": "2026.7.0",
   "render_readme": true,
   "country": "NL"
 }
