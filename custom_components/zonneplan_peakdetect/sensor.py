@@ -233,10 +233,48 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                 if prices[j] <= (peak_max - self._min_profit_eur_kwh):
                     break
             
+            # Step C: Find the next valley index where the next wave starts
+            temp_min_idx = peak_idx
+            temp_min = prices[peak_idx]
+            wave_height = peak_max - valley_min
+            for j in range(peak_idx, n):
+                if prices[j] < temp_min:
+                    temp_min = prices[j]
+                    temp_min_idx = j
+                # Break if price recovers by 1/3 of min_profit, but only after dropping by at least 40% of wave height
+                # to avoid breaking prematurely during high evening peak variations
+                if prices[j] >= temp_min + (self._min_profit_eur_kwh * 0.33) and prices[j] <= (peak_max - 0.40 * wave_height):
+                    break
+            
+            # Find the local minimum during the transition
+            local_min_idx = peak_idx
+            local_min_val = prices[peak_idx]
+            for k in range(peak_idx, temp_min_idx):
+                if prices[k] < local_min_val:
+                    local_min_val = prices[k]
+                    local_min_idx = k
+            
+            # Find the local maximum (shoulder) before the next descent
+            boundary_idx = local_min_idx
+            boundary_val = prices[local_min_idx]
+            for k in range(local_min_idx, temp_min_idx + 1):
+                if prices[k] > boundary_val:
+                    boundary_val = prices[k]
+                    boundary_idx = k
+            
+            segment_end = boundary_idx
+            # Guard: If segment_end points to the last element of the dataset, extend it to n (exclusive)
+            # so that the last element is included in the current segment and not orphaned.
+            if segment_end >= n - 1:
+                segment_end = n
+            # Guard: Prevent infinite loops by ensuring current_idx always advances by at least 1.
+            if segment_end == current_idx:
+                segment_end = current_idx + 1
+
             # Define the current wave segment
-            segment = prepared_data[current_idx : peak_idx + 1]
+            segment = prepared_data[current_idx : segment_end]
             if not segment:
-                current_idx += 1
+                current_idx = segment_end
                 continue
 
             # Process if profit threshold is met
@@ -245,7 +283,7 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                 charge_cands = [h for h in segment if h['sort_index'] < valley_idx and peak_max - h['price_eur_kwh'] > self._min_profit_eur_kwh ]
                 charge_cands.sort(key=lambda x: x['price_eur_kwh'])
                 if not charge_cands:
-                    current_idx = peak_idx
+                    current_idx = segment_end
                     continue
                 charge_slots = charge_cands[:charge_slots_count]
                                 
@@ -253,7 +291,7 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                 discharge_cands = [h for h in segment if h['sort_index'] >= valley_idx and h['price_eur_kwh'] - valley_min > self._min_profit_eur_kwh]
                 discharge_cands.sort(key=lambda x: x['price_eur_kwh'], reverse=True)
                 if not discharge_cands:
-                    current_idx = peak_idx
+                    current_idx = segment_end
                     continue
                 discharge_slots = discharge_cands[:discharge_slots_count]
 
@@ -274,7 +312,7 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                 interval_count += 1
             
             # Move index forward to the end of this wave
-            current_idx = peak_idx
+            current_idx = segment_end
 
         self._attr_extra_state_attributes['intervals'] = interval_count
         # Remove helper key before returning
