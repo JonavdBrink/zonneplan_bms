@@ -1,7 +1,7 @@
 {
   "domain": "zonneplan_peakdetect",
   "name": "Zonneplan Battery Optimizer",
-  "version": "2026.7.1",
+  "version": "2026.8.0",
   "integration_type": "service",
   "documentation": "https://github.com/jonavdbrink/zonneplan_bms",
   "issue_tracker": "https://github.com/jonavdbrink/zonneplan_bms/issues",
