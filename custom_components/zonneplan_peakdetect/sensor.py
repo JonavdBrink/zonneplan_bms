@@ -246,6 +246,9 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                 # Break if price recovers by 1/3 of min_profit, but only after dropping by at least 40% of wave height
                 # to avoid breaking prematurely during high evening peak variations
                 if temp_min <= (peak_max - 0.40 * wave_height) and prices[j] >= temp_min + (self._min_profit_eur_kwh * 0.33):
+                    # Lookahead to verify if the recovery is sustained (at least 2 periods) to filter out transient spikes
+                    if j + 1 < n and prices[j+1] < temp_min + (self._min_profit_eur_kwh * 0.33):
+                        continue
                     break
             
             # Find the local minimum during the transition
