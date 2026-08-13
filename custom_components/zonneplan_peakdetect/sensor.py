@@ -141,6 +141,8 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         if not forecast_data:
             return []
         
+        rte_factor = 1.0 - (self._price_delta_percent / 100.0)
+        
         # 1. Prepare Data
         now = dt_util.now()
         prepared_data = []
@@ -277,10 +279,10 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                 current_idx = segment_end
                 continue
 
-            # Process if profit threshold is met
-            if (peak_max - valley_min) >= self._min_profit_eur_kwh:                
+            # Process if profit threshold is met, taking round-trip efficiency into account
+            if (peak_max * rte_factor - valley_min) >= self._min_profit_eur_kwh:                
                 # CHARGE: Select cheapest hours in this wave before the valley
-                charge_cands = [h for h in segment if h['sort_index'] < valley_idx and peak_max - h['price_eur_kwh'] > self._min_profit_eur_kwh ]
+                charge_cands = [h for h in segment if h['sort_index'] < valley_idx and peak_max * rte_factor - h['price_eur_kwh'] >= self._min_profit_eur_kwh ]
                 charge_cands.sort(key=lambda x: x['price_eur_kwh'])
                 if not charge_cands:
                     current_idx = segment_end
@@ -288,7 +290,7 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                 charge_slots = charge_cands[:charge_slots_count]
                                 
                 # DISCHARGE: Select most expensive hours in this wave after the valley
-                discharge_cands = [h for h in segment if h['sort_index'] >= valley_idx and h['price_eur_kwh'] - valley_min > self._min_profit_eur_kwh]
+                discharge_cands = [h for h in segment if h['sort_index'] >= valley_idx and h['price_eur_kwh'] * rte_factor - valley_min >= self._min_profit_eur_kwh]
                 discharge_cands.sort(key=lambda x: x['price_eur_kwh'], reverse=True)
                 if not discharge_cands:
                     current_idx = segment_end
