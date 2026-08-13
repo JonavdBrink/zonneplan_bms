@@ -15,11 +15,15 @@ from .const import (
     CONF_FORECAST_ENTITY,
     CONF_MIN_PROFIT,
     CONF_RTE_PERCENT,
+    CONF_ALGORITHM,
+    ALGORITHM_WHSS,
+    ALGORITHM_HSWAS,
     DEFAULT_CENTS,
     DEFAULT_CHARGE_QUARTERS,
     DEFAULT_DISCHARGE_QUARTERS,
     DEFAULT_FORECAST_ENTITY,
     DEFAULT_PERCENTAGE,
+    DEFAULT_ALGORITHM,
     DOMAIN,
 )
 
@@ -48,6 +52,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 discharge_default = DEFAULT_DISCHARGE_QUARTERS
 
         return vol.Schema({
+            vol.Required(
+                CONF_ALGORITHM,
+                default=user_input.get(CONF_ALGORITHM, DEFAULT_ALGORITHM)
+            ): vol.In([ALGORITHM_WHSS, ALGORITHM_HSWAS]),
             vol.Required(
                 CONF_RTE_PERCENT, 
                 default=user_input.get(CONF_RTE_PERCENT, DEFAULT_PERCENTAGE)

@@ -15,6 +15,11 @@ CONF_DISCHARGE_QUARTERS = "discharge_quarters"
 CONF_RTE_PERCENT = "price_delta_percent"
 CONF_MIN_PROFIT = "min_profit_c_kwh"
 CONF_FORECAST_ENTITY = "forecast_entity"
+CONF_ALGORITHM = "algorithm_type"
+
+# Algorithm types
+ALGORITHM_WHSS = "whss"
+ALGORITHM_HSWAS = "hswas"
 
 # Standaardwaarden (optioneel)
 DEFAULT_PERCENTAGE = 20
@@ -24,6 +29,7 @@ DEFAULT_DISCHARGE_HOURS = 2  # Deprecated, fallback only
 DEFAULT_CHARGE_QUARTERS = 8
 DEFAULT_DISCHARGE_QUARTERS = 8
 DEFAULT_FORECAST_ENTITY = "sensor.zonneplan_current_quarter_hourly_electricity_tariff"
+DEFAULT_ALGORITHM = ALGORITHM_WHSS
 
 # State definitions
 ACTION_CHARGE = "Charge"

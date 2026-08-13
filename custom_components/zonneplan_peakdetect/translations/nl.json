@@ -5,6 +5,7 @@
       "user": {
         "title": "Configureer Zonneplan Peak Detection",
         "data": {
+          "algorithm_type": "Algoritme",
           "price_delta_percent": "Prijsverschil drempelpercentage",
           "min_profit_c_kwh": "Minimaal vereiste winst (cent/kWh)",
           "charge_quarters": "Laad kwartieren (15-min intervallen)",
@@ -16,6 +17,7 @@
       "reconfigure": {
         "title": "Configureer Zonneplan Peak Detection opnieuw",
         "data": {
+          "algorithm_type": "Algoritme",
           "price_delta_percent": "Prijsverschil drempelpercentage",
           "min_profit_c_kwh": "Minimaal vereiste winst (cent/kWh)",
           "charge_quarters": "Laad kwartieren (15-min intervallen)",
@@ -23,6 +25,14 @@
           "forecast_entity": "Prijssensor entiteit ID"
         },
         "description": "Pas de configuratiewaarden voor de sensor aan."
+      }
+    }
+  },
+  "selector": {
+    "algorithm_type": {
+      "options": {
+        "whss": "Standaard (WHSS)",
+        "hswas": "Geavanceerd (HSWAS) [β]"
       }
     }
   }

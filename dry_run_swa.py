@@ -88,7 +88,7 @@ def calculate_hybrid_schedule(
         best_discharge_idx = -1
         
         # Lookahead horizon to find the optimal next wave boundary
-        search_limit = n
+        search_limit = min(n, current_idx + 96)  # limit search window to next 24 hours
         
         for i in range(current_idx, search_limit - charge_quarters + 1):
             charge_slice = range(i, i + charge_quarters)

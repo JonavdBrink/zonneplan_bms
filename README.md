@@ -27,20 +27,29 @@ Repository based on: [fsaris/home-assistant-zonneplan-one](https://github.com/fs
 
 ---
 
-## 🧠 How the "Wave" Algorithm Works
+## 🧠 Supported Optimization Algorithms
 
-Instead of simply choosing global daily minimums and maximums, the Zonneplan Battery Optimizer splits the pricing forecast into separate cycles (intervals/waves) to maximize daily arbitrage opportunities:
+The Zonneplan Battery Optimizer supports two distinct optimization algorithms to schedule your home battery polymorphically. You can select your preferred algorithm directly from the Home Assistant Integration setup or reconfiguration panel.
+
+### 1. Standard (WHSS) — Wave Heuristic Slot Scheduler (Default)
+The **Standard (WHSS)** algorithm is the original and proven optimization engine of this integration. It segments the pricing timeline dynamically into distinct daily waves (cycles) and schedules slot-picking within those boundaries:
 
 1. **Valley Detection**: Starting from the current slot, the algorithm tracks prices to find a local valley (dip). The search for a valley stops when prices recover by more than your configured minimum profit threshold (`min_profit_c_kwh`).
 2. **Peak Detection**: After the local valley, the algorithm tracks prices to find a subsequent local peak (hump). This peak search stops when prices drop by more than the minimum profit threshold, indicating the end of the wave and the start of the next cycle.
-3. **Threshold Check**: An interval is only deemed profitable if the maximum peak price minus the minimum valley price is greater than or equal to your configured minimum profit.
-4. **Slot Selection**:
+3. **Threshold Check**: An interval is only deemed profitable if the maximum peak price minus the minimum valley price (after incorporating the battery's Round-Trip Efficiency) is greater than or equal to your configured minimum profit.
+4. **Slot Selection (Balanced)**:
    - **Charge Slots**: Selects the cheapest slots *before* the valley within the current wave where the price is low enough to yield the required profit.
    - **Discharge Slots**: Selects the most expensive slots *after* the valley within the current wave where the price is high enough to yield the required profit.
-5. **Balancing & Resolution Scaling**:
-   - The scheduler dynamically detects the forecast interval duration (e.g., 15 minutes or 60 minutes) from the input sensor.
-   - Your configured `charge_quarters` and `discharge_quarters` are automatically scaled to the correct number of slots (e.g. if the forecast is hourly instead of quarterly, a configuration of 8 quarters is scaled down to 2 hourly slots).
-   - To prevent over-charging/under-discharging, the number of scheduled charging slots is constrained by the number of available profitable discharging slots in that wave. All other slots are marked as `Stop`.
+   - To prevent over-charging/under-discharging, the scheduled charging slots are constrained by the number of available profitable discharging slots in that wave.
+
+---
+
+### 2. Advanced (HSWAS) [β] — Hybrid SWA-Wave-Slot (Beta)
+The **Advanced (HSWAS) [β]** algorithm is our cutting-edge, opt-in optimization solver designed for maximum resilience against high-frequency price fluctuations and extreme price volatility:
+
+1. **Algorithm A (Chronological Wave Finder)**: Scans your price forecast sequentially using forward-sliding window moving averages (of lengths `charge_quarters` and `discharge_quarters`) to locate the most profitable wave segments. By comparing window averages instead of raw points, SWA is completely immune to transient, short-term evening spikes (eliminating wave-splitting errors) and mathematically guarantees strictly non-overlapping, chronologically correct (charge-then-discharge) cycles.
+2. **Algorithm B (Slot Optimizer)**: Discards the rigid consecutive-window constraint within each SWA-demarcated wave boundary. It partitions each wave into a pre-discharge *charge pool* and a post-charge *discharge pool*, then independently schedules the absolute cheapest quarters to charge and most expensive quarters to discharge, allowing gaps (standby) in between for maximum yield.
+3. **Independent (Unbalanced) Slot Quotas**: Unlike the Wave Heuristic, HSWAS does not force balancing limits (min of charge/discharge) on the selected slots, fully honoring your independent `charge_quarters` and `discharge_quarters` configuration.
 
 ---
 
@@ -50,6 +59,7 @@ During the integrations setup flow (or via **Configure**), you can customize the
 
 | Parameter | Key / Config Name | Default | Description |
 | :--- | :--- | :--- | :--- |
+| **Algorithm** | `algorithm_type` | `Standard (WHSS)` | The arbitrage optimization algorithm to run. Choose between the **Standard (WHSS)** peak/valley tracker, or the advanced, opt-in **Advanced (HSWAS) [β]** sliding-window solver. |
 | **Forecast Entity** | `forecast_entity` | `sensor.zonneplan_current_quarter_hourly_electricity_tariff` | The Home Assistant entity that provides the electricity price forecast attribute. Supports both standard hourly and quarter-hourly formats. |
 | **Minimum Profit** | `min_profit_c_kwh` | `6` | The minimum price difference (in cents per kWh) required between charge and discharge intervals to trigger an action. |
 | **Charge Quarters** | `charge_quarters` | `8` | Maximum charging duration (in 15-minute quarters) allowed per price wave/interval (e.g., `8` quarters = 2 hours). |

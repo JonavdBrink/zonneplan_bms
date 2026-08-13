@@ -3,6 +3,7 @@
     "step": {
       "user": {
         "data": {
+          "algorithm_type": "Algorithm",
           "price_delta_percent": "Price delta threshold percentage",
           "min_profit_c_kwh": "Minimum profit required (cents/kWh)",
           "charge_quarters": "Charge quarters (15-min intervals)",
@@ -13,6 +14,7 @@
       },
       "reconfigure": {
         "data": {
+          "algorithm_type": "Algorithm",
           "price_delta_percent": "Price delta threshold percentage",
           "min_profit_c_kwh": "Minimum profit required (cents/kWh)",
           "charge_quarters": "Charge quarters (15-min intervals)",
@@ -20,6 +22,14 @@
           "forecast_entity": "Price forecast entity ID"
         },
         "description": "Adjust the configuration values for the sensor."
+      }
+    }
+  },
+  "selector": {
+    "algorithm_type": {
+      "options": {
+        "whss": "Standard (WHSS)",
+        "hswas": "Advanced (HSWAS) [β]"
       }
     }
   }
