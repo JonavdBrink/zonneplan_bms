@@ -160,11 +160,18 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
             if raw_price is None:
                 raw_price = item.get('electricity_price')
             
-            if raw_price is None or raw_dt is None:
-                LOGGER.warning("Incomplete forecast data at index %d: %s", idx, item)
+            if raw_dt is None:
+                LOGGER.warning("Incomplete forecast data (missing datetime) at index %d: %s", idx, item)
                 continue
                 
-            price = self._convert_price(raw_price)
+            if 'price_eur_kwh' in item:
+                price = item['price_eur_kwh']
+            elif raw_price is not None:
+                price = self._convert_price(raw_price)
+            else:
+                LOGGER.warning("Incomplete forecast data (missing price) at index %d: %s", idx, item)
+                continue
+                
             if price < running_min:
                 running_min = price
             
