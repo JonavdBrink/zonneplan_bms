@@ -1,0 +1,1195 @@
+state:
+  translated: Charge
+  raw: Charge
+  last_changed: '2026-08-28T12:00:00.125Z'
+  last_updated: '2026-08-28T12:00:00.125Z'
+attributes:
+  schedule:
+    - datetime: '2026-08-27T13:00:00+02:00'
+      price_eur_kwh: 0.130848
+      price_multiplier: 1
+      action: Charge
+      interval_id: 0
+    - datetime: '2026-08-27T13:15:00+02:00'
+      price_eur_kwh: 0.1322153
+      price_multiplier: 1.01
+      action: Charge
+      interval_id: 0
+    - datetime: '2026-08-27T13:30:00+02:00'
+      price_eur_kwh: 0.1416049
+      price_multiplier: 1.08
+      action: Charge
+      interval_id: 0
+    - datetime: '2026-08-27T13:45:00+02:00'
+      price_eur_kwh: 0.1429238
+      price_multiplier: 1.09
+      action: Charge
+      interval_id: 0
+    - datetime: '2026-08-27T14:00:00+02:00'
+      price_eur_kwh: 0.1308601
+      price_multiplier: 1
+      action: Charge
+      interval_id: 0
+    - datetime: '2026-08-27T14:15:00+02:00'
+      price_eur_kwh: 0.1429117
+      price_multiplier: 1.09
+      action: Charge
+      interval_id: 0
+    - datetime: '2026-08-27T14:30:00+02:00'
+      price_eur_kwh: 0.151781
+      price_multiplier: 1.16
+      action: Charge
+      interval_id: 0
+    - datetime: '2026-08-27T14:45:00+02:00'
+      price_eur_kwh: 0.1704028
+      price_multiplier: 1.3
+      action: Charge
+      interval_id: 0
+    - datetime: '2026-08-27T15:00:00+02:00'
+      price_eur_kwh: 0.130848
+      price_multiplier: 1
+      action: Charge
+      interval_id: 0
+    - datetime: '2026-08-27T15:15:00+02:00'
+      price_eur_kwh: 0.155048
+      price_multiplier: 1.18
+      action: Charge
+      interval_id: 0
+    - datetime: '2026-08-27T15:30:00+02:00'
+      price_eur_kwh: 0.2202065
+      price_multiplier: 1.68
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-27T15:45:00+02:00'
+      price_eur_kwh: 0.2588539
+      price_multiplier: 1.98
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-27T16:00:00+02:00'
+      price_eur_kwh: 0.2090745
+      price_multiplier: 1.6
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-27T16:15:00+02:00'
+      price_eur_kwh: 0.251848
+      price_multiplier: 1.92
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-27T16:30:00+02:00'
+      price_eur_kwh: 0.2873373
+      price_multiplier: 2.2
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-27T16:45:00+02:00'
+      price_eur_kwh: 0.312953
+      price_multiplier: 2.39
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-27T17:00:00+02:00'
+      price_eur_kwh: 0.2759996
+      price_multiplier: 2.11
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-27T17:15:00+02:00'
+      price_eur_kwh: 0.3031278
+      price_multiplier: 2.32
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-27T17:30:00+02:00'
+      price_eur_kwh: 0.338605
+      price_multiplier: 2.59
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-27T17:45:00+02:00'
+      price_eur_kwh: 0.3645595
+      price_multiplier: 2.79
+      action: Discharge
+      interval_id: 0
+    - datetime: '2026-08-27T18:00:00+02:00'
+      price_eur_kwh: 0.3179261
+      price_multiplier: 2.43
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-27T18:15:00+02:00'
+      price_eur_kwh: 0.3397423
+      price_multiplier: 2.6
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-27T18:30:00+02:00'
+      price_eur_kwh: 0.3543229
+      price_multiplier: 2.71
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-27T18:45:00+02:00'
+      price_eur_kwh: 0.3825885
+      price_multiplier: 2.92
+      action: Discharge
+      interval_id: 0
+    - datetime: '2026-08-27T19:00:00+02:00'
+      price_eur_kwh: 0.3610384
+      price_multiplier: 2.76
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-27T19:15:00+02:00'
+      price_eur_kwh: 0.3758125
+      price_multiplier: 2.87
+      action: Discharge
+      interval_id: 0
+    - datetime: '2026-08-27T19:30:00+02:00'
+      price_eur_kwh: 0.3927041
+      price_multiplier: 3
+      action: Discharge
+      interval_id: 0
+    - datetime: '2026-08-27T19:45:00+02:00'
+      price_eur_kwh: 0.3998794
+      price_multiplier: 3.06
+      action: Discharge
+      interval_id: 0
+    - datetime: '2026-08-27T20:00:00+02:00'
+      price_eur_kwh: 0.3900784
+      price_multiplier: 2.98
+      action: Discharge
+      interval_id: 0
+    - datetime: '2026-08-27T20:15:00+02:00'
+      price_eur_kwh: 0.3724729
+      price_multiplier: 2.85
+      action: Discharge
+      interval_id: 0
+    - datetime: '2026-08-27T20:30:00+02:00'
+      price_eur_kwh: 0.3656969
+      price_multiplier: 2.79
+      action: Discharge
+      interval_id: 0
+    - datetime: '2026-08-27T20:45:00+02:00'
+      price_eur_kwh: 0.3547948
+      price_multiplier: 2.71
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-27T21:00:00+02:00'
+      price_eur_kwh: 0.3740217
+      price_multiplier: 2.86
+      action: Discharge
+      interval_id: 0
+    - datetime: '2026-08-27T21:15:00+02:00'
+      price_eur_kwh: 0.3569244
+      price_multiplier: 2.73
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-27T21:30:00+02:00'
+      price_eur_kwh: 0.3494224
+      price_multiplier: 2.67
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-27T21:45:00+02:00'
+      price_eur_kwh: 0.3395004
+      price_multiplier: 2.59
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-27T22:00:00+02:00'
+      price_eur_kwh: 0.3528467
+      price_multiplier: 2.7
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-27T22:15:00+02:00'
+      price_eur_kwh: 0.3450906
+      price_multiplier: 2.64
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-27T22:30:00+02:00'
+      price_eur_kwh: 0.330498
+      price_multiplier: 2.53
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-27T22:45:00+02:00'
+      price_eur_kwh: 0.3050275
+      price_multiplier: 2.33
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-27T23:00:00+02:00'
+      price_eur_kwh: 0.3255128
+      price_multiplier: 2.49
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-27T23:15:00+02:00'
+      price_eur_kwh: 0.3124689
+      price_multiplier: 2.39
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-27T23:30:00+02:00'
+      price_eur_kwh: 0.3162321
+      price_multiplier: 2.42
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-27T23:45:00+02:00'
+      price_eur_kwh: 0.3240971
+      price_multiplier: 2.48
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T00:00:00+02:00'
+      price_eur_kwh: 0.3428521
+      price_multiplier: 2.62
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T00:15:00+02:00'
+      price_eur_kwh: 0.3373466
+      price_multiplier: 2.58
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T00:30:00+02:00'
+      price_eur_kwh: 0.3207211
+      price_multiplier: 2.45
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T00:45:00+02:00'
+      price_eur_kwh: 0.3082945
+      price_multiplier: 2.36
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T01:00:00+02:00'
+      price_eur_kwh: 0.3488779
+      price_multiplier: 2.67
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T01:15:00+02:00'
+      price_eur_kwh: 0.3385203
+      price_multiplier: 2.59
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T01:30:00+02:00'
+      price_eur_kwh: 0.3321315
+      price_multiplier: 2.54
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T01:45:00+02:00'
+      price_eur_kwh: 0.3143687
+      price_multiplier: 2.4
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T02:00:00+02:00'
+      price_eur_kwh: 0.3162684
+      price_multiplier: 2.42
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T02:15:00+02:00'
+      price_eur_kwh: 0.3102184
+      price_multiplier: 2.37
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T02:30:00+02:00'
+      price_eur_kwh: 0.3098312
+      price_multiplier: 2.37
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T02:45:00+02:00'
+      price_eur_kwh: 0.3032729
+      price_multiplier: 2.32
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T03:00:00+02:00'
+      price_eur_kwh: 0.3091899
+      price_multiplier: 2.36
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T03:15:00+02:00'
+      price_eur_kwh: 0.3068909
+      price_multiplier: 2.35
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T03:30:00+02:00'
+      price_eur_kwh: 0.3051727
+      price_multiplier: 2.33
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T03:45:00+02:00'
+      price_eur_kwh: 0.3022323
+      price_multiplier: 2.31
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T04:00:00+02:00'
+      price_eur_kwh: 0.3034424
+      price_multiplier: 2.32
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T04:15:00+02:00'
+      price_eur_kwh: 0.3068303
+      price_multiplier: 2.34
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T04:30:00+02:00'
+      price_eur_kwh: 0.3077378
+      price_multiplier: 2.35
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T04:45:00+02:00'
+      price_eur_kwh: 0.3075322
+      price_multiplier: 2.35
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T05:00:00+02:00'
+      price_eur_kwh: 0.3020267
+      price_multiplier: 2.31
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T05:15:00+02:00'
+      price_eur_kwh: 0.3076169
+      price_multiplier: 2.35
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T05:30:00+02:00'
+      price_eur_kwh: 0.3171033
+      price_multiplier: 2.42
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T05:45:00+02:00'
+      price_eur_kwh: 0.3327002
+      price_multiplier: 2.54
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T06:00:00+02:00'
+      price_eur_kwh: 0.3354227
+      price_multiplier: 2.56
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T06:15:00+02:00'
+      price_eur_kwh: 0.3456472
+      price_multiplier: 2.64
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T06:30:00+02:00'
+      price_eur_kwh: 0.3477768
+      price_multiplier: 2.66
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T06:45:00+02:00'
+      price_eur_kwh: 0.3460707
+      price_multiplier: 2.64
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T07:00:00+02:00'
+      price_eur_kwh: 0.3536452
+      price_multiplier: 2.7
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T07:15:00+02:00'
+      price_eur_kwh: 0.354105
+      price_multiplier: 2.71
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T07:30:00+02:00'
+      price_eur_kwh: 0.3501605
+      price_multiplier: 2.68
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T07:45:00+02:00'
+      price_eur_kwh: 0.3461312
+      price_multiplier: 2.65
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T08:00:00+02:00'
+      price_eur_kwh: 0.3639908
+      price_multiplier: 2.78
+      action: Discharge
+      interval_id: 0
+    - datetime: '2026-08-28T08:15:00+02:00'
+      price_eur_kwh: 0.3441105
+      price_multiplier: 2.63
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T08:30:00+02:00'
+      price_eur_kwh: 0.331829
+      price_multiplier: 2.54
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T08:45:00+02:00'
+      price_eur_kwh: 0.322391
+      price_multiplier: 2.46
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T09:00:00+02:00'
+      price_eur_kwh: 0.3300986
+      price_multiplier: 2.52
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T09:15:00+02:00'
+      price_eur_kwh: 0.3308489
+      price_multiplier: 2.53
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T09:30:00+02:00'
+      price_eur_kwh: 0.3157481
+      price_multiplier: 2.41
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T09:45:00+02:00'
+      price_eur_kwh: 0.3113315
+      price_multiplier: 2.38
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T10:00:00+02:00'
+      price_eur_kwh: 0.3209026
+      price_multiplier: 2.45
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T10:15:00+02:00'
+      price_eur_kwh: 0.3057656
+      price_multiplier: 2.34
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T10:30:00+02:00'
+      price_eur_kwh: 0.2919595
+      price_multiplier: 2.23
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T10:45:00+02:00'
+      price_eur_kwh: 0.2759875
+      price_multiplier: 2.11
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T11:00:00+02:00'
+      price_eur_kwh: 0.2861878
+      price_multiplier: 2.19
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T11:15:00+02:00'
+      price_eur_kwh: 0.2762174
+      price_multiplier: 2.11
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T11:30:00+02:00'
+      price_eur_kwh: 0.2702521
+      price_multiplier: 2.07
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T11:45:00+02:00'
+      price_eur_kwh: 0.2797627
+      price_multiplier: 2.14
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T12:00:00+02:00'
+      price_eur_kwh: 0.2648797
+      price_multiplier: 2.02
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T12:15:00+02:00'
+      price_eur_kwh: 0.2600276
+      price_multiplier: 1.99
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T12:30:00+02:00'
+      price_eur_kwh: 0.2647708
+      price_multiplier: 2.02
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T12:45:00+02:00'
+      price_eur_kwh: 0.2838646
+      price_multiplier: 2.17
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T13:00:00+02:00'
+      price_eur_kwh: 0.2557805
+      price_multiplier: 1.95
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T13:15:00+02:00'
+      price_eur_kwh: 0.2637786
+      price_multiplier: 2.02
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T13:30:00+02:00'
+      price_eur_kwh: 0.2651701
+      price_multiplier: 2.03
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T13:45:00+02:00'
+      price_eur_kwh: 0.2600881
+      price_multiplier: 1.99
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-28T14:00:00+02:00'
+      price_eur_kwh: 0.2498394
+      price_multiplier: 1.94
+      action: Charge
+      interval_id: 1
+    - datetime: '2026-08-28T14:15:00+02:00'
+      price_eur_kwh: 0.246052
+      price_multiplier: 1.91
+      action: Charge
+      interval_id: 1
+    - datetime: '2026-08-28T14:30:00+02:00'
+      price_eur_kwh: 0.2539654
+      price_multiplier: 1.97
+      action: Charge
+      interval_id: 1
+    - datetime: '2026-08-28T14:45:00+02:00'
+      price_eur_kwh: 0.2489682
+      price_multiplier: 1.93
+      action: Charge
+      interval_id: 1
+    - datetime: '2026-08-28T15:00:00+02:00'
+      price_eur_kwh: 0.2599913
+      price_multiplier: 2.01
+      action: Charge
+      interval_id: 1
+    - datetime: '2026-08-28T15:15:00+02:00'
+      price_eur_kwh: 0.2578496
+      price_multiplier: 2
+      action: Charge
+      interval_id: 1
+    - datetime: '2026-08-28T15:30:00+02:00'
+      price_eur_kwh: 0.2623387
+      price_multiplier: 2.03
+      action: Charge
+      interval_id: 1
+    - datetime: '2026-08-28T15:45:00+02:00'
+      price_eur_kwh: 0.2616369
+      price_multiplier: 2.03
+      action: Charge
+      interval_id: 1
+    - datetime: '2026-08-28T16:00:00+02:00'
+      price_eur_kwh: 0.2562524
+      price_multiplier: 1.99
+      action: Charge
+      interval_id: 1
+    - datetime: '2026-08-28T16:15:00+02:00'
+      price_eur_kwh: 0.2627017
+      price_multiplier: 2.04
+      action: Charge
+      interval_id: 1
+    - datetime: '2026-08-28T16:30:00+02:00'
+      price_eur_kwh: 0.2700222
+      price_multiplier: 2.09
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-28T16:45:00+02:00'
+      price_eur_kwh: 0.2723454
+      price_multiplier: 2.11
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-28T17:00:00+02:00'
+      price_eur_kwh: 0.2624718
+      price_multiplier: 2.03
+      action: Charge
+      interval_id: 1
+    - datetime: '2026-08-28T17:15:00+02:00'
+      price_eur_kwh: 0.2805976
+      price_multiplier: 2.17
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-28T17:30:00+02:00'
+      price_eur_kwh: 0.3129288
+      price_multiplier: 2.42
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-28T17:45:00+02:00'
+      price_eur_kwh: 0.3274004
+      price_multiplier: 2.54
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-28T18:00:00+02:00'
+      price_eur_kwh: 0.2999697
+      price_multiplier: 2.32
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-28T18:15:00+02:00'
+      price_eur_kwh: 0.322996
+      price_multiplier: 2.5
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-28T18:30:00+02:00'
+      price_eur_kwh: 0.3331116
+      price_multiplier: 2.58
+      action: Discharge
+      interval_id: 1
+    - datetime: '2026-08-28T18:45:00+02:00'
+      price_eur_kwh: 0.336669
+      price_multiplier: 2.61
+      action: Discharge
+      interval_id: 1
+    - datetime: '2026-08-28T19:00:00+02:00'
+      price_eur_kwh: 0.3145381
+      price_multiplier: 2.44
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-28T19:15:00+02:00'
+      price_eur_kwh: 0.3318895
+      price_multiplier: 2.57
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-28T19:30:00+02:00'
+      price_eur_kwh: 0.3435781
+      price_multiplier: 2.66
+      action: Discharge
+      interval_id: 1
+    - datetime: '2026-08-28T19:45:00+02:00'
+      price_eur_kwh: 0.3658662
+      price_multiplier: 2.84
+      action: Discharge
+      interval_id: 1
+    - datetime: '2026-08-28T20:00:00+02:00'
+      price_eur_kwh: 0.3415332
+      price_multiplier: 2.65
+      action: Discharge
+      interval_id: 1
+    - datetime: '2026-08-28T20:15:00+02:00'
+      price_eur_kwh: 0.3453931
+      price_multiplier: 2.68
+      action: Discharge
+      interval_id: 1
+    - datetime: '2026-08-28T20:30:00+02:00'
+      price_eur_kwh: 0.3495555
+      price_multiplier: 2.71
+      action: Discharge
+      interval_id: 1
+    - datetime: '2026-08-28T20:45:00+02:00'
+      price_eur_kwh: 0.3411823
+      price_multiplier: 2.64
+      action: Discharge
+      interval_id: 1
+    - datetime: '2026-08-28T21:00:00+02:00'
+      price_eur_kwh: 0.344171
+      price_multiplier: 2.67
+      action: Discharge
+      interval_id: 1
+    - datetime: '2026-08-28T21:15:00+02:00'
+      price_eur_kwh: 0.3343458
+      price_multiplier: 2.59
+      action: Discharge
+      interval_id: 1
+    - datetime: '2026-08-28T21:30:00+02:00'
+      price_eur_kwh: 0.3317322
+      price_multiplier: 2.57
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-28T21:45:00+02:00'
+      price_eur_kwh: 0.3174905
+      price_multiplier: 2.46
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-28T22:00:00+02:00'
+      price_eur_kwh: 0.3382904
+      price_multiplier: 2.62
+      action: Discharge
+      interval_id: 1
+    - datetime: '2026-08-28T22:15:00+02:00'
+      price_eur_kwh: 0.3274487
+      price_multiplier: 2.54
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-28T22:30:00+02:00'
+      price_eur_kwh: 0.3266986
+      price_multiplier: 2.53
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-28T22:45:00+02:00'
+      price_eur_kwh: 0.313558
+      price_multiplier: 2.43
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-28T23:00:00+02:00'
+      price_eur_kwh: 0.3144775
+      price_multiplier: 2.44
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-28T23:15:00+02:00'
+      price_eur_kwh: 0.3100126
+      price_multiplier: 2.4
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-28T23:30:00+02:00'
+      price_eur_kwh: 0.298433
+      price_multiplier: 2.31
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-28T23:45:00+02:00'
+      price_eur_kwh: 0.28937
+      price_multiplier: 2.24
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T00:00:00+02:00'
+      price_eur_kwh: 0.2897936
+      price_multiplier: 2.25
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T00:15:00+02:00'
+      price_eur_kwh: 0.2956016
+      price_multiplier: 2.29
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T00:30:00+02:00'
+      price_eur_kwh: 0.2864177
+      price_multiplier: 2.22
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T00:45:00+02:00'
+      price_eur_kwh: 0.2731077
+      price_multiplier: 2.12
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T01:00:00+02:00'
+      price_eur_kwh: 0.2697681
+      price_multiplier: 2.09
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T01:15:00+02:00'
+      price_eur_kwh: 0.2692841
+      price_multiplier: 2.09
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T01:30:00+02:00'
+      price_eur_kwh: 0.2640932
+      price_multiplier: 2.05
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T01:45:00+02:00'
+      price_eur_kwh: 0.2607173
+      price_multiplier: 2.02
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T02:00:00+02:00'
+      price_eur_kwh: 0.260681
+      price_multiplier: 2.02
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T02:15:00+02:00'
+      price_eur_kwh: 0.2536872
+      price_multiplier: 1.97
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T02:30:00+02:00'
+      price_eur_kwh: 0.2514487
+      price_multiplier: 1.95
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T02:45:00+02:00'
+      price_eur_kwh: 0.2412
+      price_multiplier: 1.87
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T03:00:00+02:00'
+      price_eur_kwh: 0.248218
+      price_multiplier: 1.92
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T03:15:00+02:00'
+      price_eur_kwh: 0.2411878
+      price_multiplier: 1.87
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T03:30:00+02:00'
+      price_eur_kwh: 0.2402803
+      price_multiplier: 1.86
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T03:45:00+02:00'
+      price_eur_kwh: 0.2419259
+      price_multiplier: 1.87
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T04:00:00+02:00'
+      price_eur_kwh: 0.2477824
+      price_multiplier: 1.92
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T04:15:00+02:00'
+      price_eur_kwh: 0.2435837
+      price_multiplier: 1.89
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T04:30:00+02:00'
+      price_eur_kwh: 0.2404134
+      price_multiplier: 1.86
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T04:45:00+02:00'
+      price_eur_kwh: 0.2375579
+      price_multiplier: 1.84
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T05:00:00+02:00'
+      price_eur_kwh: 0.2505412
+      price_multiplier: 1.94
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T05:15:00+02:00'
+      price_eur_kwh: 0.2449146
+      price_multiplier: 1.9
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T05:30:00+02:00'
+      price_eur_kwh: 0.2448058
+      price_multiplier: 1.9
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T05:45:00+02:00'
+      price_eur_kwh: 0.2465845
+      price_multiplier: 1.91
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T06:00:00+02:00'
+      price_eur_kwh: 0.2492949
+      price_multiplier: 1.93
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T06:15:00+02:00'
+      price_eur_kwh: 0.2495006
+      price_multiplier: 1.93
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T06:30:00+02:00'
+      price_eur_kwh: 0.2489198
+      price_multiplier: 1.93
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T06:45:00+02:00'
+      price_eur_kwh: 0.2480364
+      price_multiplier: 1.92
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T07:00:00+02:00'
+      price_eur_kwh: 0.2606447
+      price_multiplier: 2.02
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T07:15:00+02:00'
+      price_eur_kwh: 0.2565428
+      price_multiplier: 1.99
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T07:30:00+02:00'
+      price_eur_kwh: 0.2528039
+      price_multiplier: 1.96
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T07:45:00+02:00'
+      price_eur_kwh: 0.2434869
+      price_multiplier: 1.89
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T08:00:00+02:00'
+      price_eur_kwh: 0.2600881
+      price_multiplier: 2.02
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T08:15:00+02:00'
+      price_eur_kwh: 0.2325606
+      price_multiplier: 1.8
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T08:30:00+02:00'
+      price_eur_kwh: 0.1814865
+      price_multiplier: 1.41
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T08:45:00+02:00'
+      price_eur_kwh: 0.143069
+      price_multiplier: 1.11
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T09:00:00+02:00'
+      price_eur_kwh: 0.1533056
+      price_multiplier: 1.19
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T09:15:00+02:00'
+      price_eur_kwh: 0.1331833
+      price_multiplier: 1.03
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T09:30:00+02:00'
+      price_eur_kwh: 0.1312231
+      price_multiplier: 1.02
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T09:45:00+02:00'
+      price_eur_kwh: 0.1308843
+      price_multiplier: 1.01
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T10:00:00+02:00'
+      price_eur_kwh: 0.1314409
+      price_multiplier: 1.02
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T10:15:00+02:00'
+      price_eur_kwh: 0.1311868
+      price_multiplier: 1.02
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T10:30:00+02:00'
+      price_eur_kwh: 0.130848
+      price_multiplier: 1.01
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T10:45:00+02:00'
+      price_eur_kwh: 0.1305455
+      price_multiplier: 1.01
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T11:00:00+02:00'
+      price_eur_kwh: 0.1306303
+      price_multiplier: 1.01
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T11:15:00+02:00'
+      price_eur_kwh: 0.1300978
+      price_multiplier: 1.01
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T11:30:00+02:00'
+      price_eur_kwh: 0.1300615
+      price_multiplier: 1.01
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T11:45:00+02:00'
+      price_eur_kwh: 0.1297711
+      price_multiplier: 1.01
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T12:00:00+02:00'
+      price_eur_kwh: 0.1295654
+      price_multiplier: 1
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T12:15:00+02:00'
+      price_eur_kwh: 0.1291903
+      price_multiplier: 1
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T12:30:00+02:00'
+      price_eur_kwh: 0.1290451
+      price_multiplier: 1
+      action: Stop
+      interval_id: 1
+    - datetime: '2026-08-29T12:45:00+02:00'
+      price_eur_kwh: 0.1293839
+      price_multiplier: 1.01
+      action: Charge
+      interval_id: 2
+    - datetime: '2026-08-29T13:00:00+02:00'
+      price_eur_kwh: 0.1285369
+      price_multiplier: 1
+      action: Charge
+      interval_id: 2
+    - datetime: '2026-08-29T13:15:00+02:00'
+      price_eur_kwh: 0.1285611
+      price_multiplier: 1
+      action: Charge
+      interval_id: 2
+    - datetime: '2026-08-29T13:30:00+02:00'
+      price_eur_kwh: 0.1288031
+      price_multiplier: 1
+      action: Charge
+      interval_id: 2
+    - datetime: '2026-08-29T13:45:00+02:00'
+      price_eur_kwh: 0.1297953
+      price_multiplier: 1.01
+      action: Charge
+      interval_id: 2
+    - datetime: '2026-08-29T14:00:00+02:00'
+      price_eur_kwh: 0.1296743
+      price_multiplier: 1.01
+      action: Charge
+      interval_id: 2
+    - datetime: '2026-08-29T14:15:00+02:00'
+      price_eur_kwh: 0.1299284
+      price_multiplier: 1.01
+      action: Charge
+      interval_id: 2
+    - datetime: '2026-08-29T14:30:00+02:00'
+      price_eur_kwh: 0.1304487
+      price_multiplier: 1.01
+      action: Charge
+      interval_id: 2
+    - datetime: '2026-08-29T14:45:00+02:00'
+      price_eur_kwh: 0.1308359
+      price_multiplier: 1.02
+      action: Charge
+      interval_id: 2
+    - datetime: '2026-08-29T15:00:00+02:00'
+      price_eur_kwh: 0.1319128
+      price_multiplier: 1.03
+      action: Charge
+      interval_id: 2
+    - datetime: '2026-08-29T15:15:00+02:00'
+      price_eur_kwh: 0.1319491
+      price_multiplier: 1.03
+      action: Charge
+      interval_id: 2
+    - datetime: '2026-08-29T15:30:00+02:00'
+      price_eur_kwh: 0.132542
+      price_multiplier: 1.03
+      action: Charge
+      interval_id: 2
+    - datetime: '2026-08-29T15:45:00+02:00'
+      price_eur_kwh: 0.141254
+      price_multiplier: 1.1
+      action: Stop
+      interval_id: 2
+    - datetime: '2026-08-29T16:00:00+02:00'
+      price_eur_kwh: 0.1311868
+      price_multiplier: 1.02
+      action: Charge
+      interval_id: 2
+    - datetime: '2026-08-29T16:15:00+02:00'
+      price_eur_kwh: 0.1355307
+      price_multiplier: 1.05
+      action: Stop
+      interval_id: 2
+    - datetime: '2026-08-29T16:30:00+02:00'
+      price_eur_kwh: 0.1670391
+      price_multiplier: 1.3
+      action: Stop
+      interval_id: 2
+    - datetime: '2026-08-29T16:45:00+02:00'
+      price_eur_kwh: 0.2030124
+      price_multiplier: 1.58
+      action: Stop
+      interval_id: 2
+    - datetime: '2026-08-29T17:00:00+02:00'
+      price_eur_kwh: 0.1892062
+      price_multiplier: 1.47
+      action: Stop
+      interval_id: 2
+    - datetime: '2026-08-29T17:15:00+02:00'
+      price_eur_kwh: 0.2417082
+      price_multiplier: 1.88
+      action: Stop
+      interval_id: 2
+    - datetime: '2026-08-29T17:30:00+02:00'
+      price_eur_kwh: 0.2753462
+      price_multiplier: 2.14
+      action: Stop
+      interval_id: 2
+    - datetime: '2026-08-29T17:45:00+02:00'
+      price_eur_kwh: 0.3108476
+      price_multiplier: 2.42
+      action: Stop
+      interval_id: 2
+    - datetime: '2026-08-29T18:00:00+02:00'
+      price_eur_kwh: 0.2863087
+      price_multiplier: 2.23
+      action: Stop
+      interval_id: 2
+    - datetime: '2026-08-29T18:15:00+02:00'
+      price_eur_kwh: 0.2930243
+      price_multiplier: 2.28
+      action: Stop
+      interval_id: 2
+    - datetime: '2026-08-29T18:30:00+02:00'
+      price_eur_kwh: 0.3277149
+      price_multiplier: 2.55
+      action: Discharge
+      interval_id: 2
+    - datetime: '2026-08-29T18:45:00+02:00'
+      price_eur_kwh: 0.3488779
+      price_multiplier: 2.71
+      action: Discharge
+      interval_id: 2
+    - datetime: '2026-08-29T19:00:00+02:00'
+      price_eur_kwh: 0.329893
+      price_multiplier: 2.57
+      action: Discharge
+      interval_id: 2
+    - datetime: '2026-08-29T19:15:00+02:00'
+      price_eur_kwh: 0.3477768
+      price_multiplier: 2.71
+      action: Discharge
+      interval_id: 2
+    - datetime: '2026-08-29T19:30:00+02:00'
+      price_eur_kwh: 0.3660357
+      price_multiplier: 2.85
+      action: Discharge
+      interval_id: 2
+    - datetime: '2026-08-29T19:45:00+02:00'
+      price_eur_kwh: 0.3798418
+      price_multiplier: 2.96
+      action: Discharge
+      interval_id: 2
+    - datetime: '2026-08-29T20:00:00+02:00'
+      price_eur_kwh: 0.3815358
+      price_multiplier: 2.97
+      action: Discharge
+      interval_id: 2
+    - datetime: '2026-08-29T20:15:00+02:00'
+      price_eur_kwh: 0.3616675
+      price_multiplier: 2.81
+      action: Discharge
+      interval_id: 2
+    - datetime: '2026-08-29T20:30:00+02:00'
+      price_eur_kwh: 0.3455262
+      price_multiplier: 2.69
+      action: Discharge
+      interval_id: 2
+    - datetime: '2026-08-29T20:45:00+02:00'
+      price_eur_kwh: 0.3439048
+      price_multiplier: 2.68
+      action: Discharge
+      interval_id: 2
+    - datetime: '2026-08-29T21:00:00+02:00'
+      price_eur_kwh: 0.3731384
+      price_multiplier: 2.9
+      action: Discharge
+      interval_id: 2
+    - datetime: '2026-08-29T21:15:00+02:00'
+      price_eur_kwh: 0.3397182
+      price_multiplier: 2.64
+      action: Discharge
+      interval_id: 2
+    - datetime: '2026-08-29T21:30:00+02:00'
+      price_eur_kwh: 0.3267833
+      price_multiplier: 2.54
+      action: Stop
+      interval_id: 2
+    - datetime: '2026-08-29T21:45:00+02:00'
+      price_eur_kwh: 0.3155787
+      price_multiplier: 2.46
+      action: Stop
+      interval_id: 2
+    - datetime: '2026-08-29T22:00:00+02:00'
+      price_eur_kwh: 0.3385566
+      price_multiplier: 2.63
+      action: Discharge
+      interval_id: 2
+    - datetime: '2026-08-29T22:15:00+02:00'
+      price_eur_kwh: 0.3188457
+      price_multiplier: 2.48
+      action: Stop
+      interval_id: 2
+    - datetime: '2026-08-29T22:30:00+02:00'
+      price_eur_kwh: 0.3206123
+      price_multiplier: 2.49
+      action: Stop
+      interval_id: 2
+    - datetime: '2026-08-29T22:45:00+02:00'
+      price_eur_kwh: 0.3128562
+      price_multiplier: 2.43
+      action: Stop
+      interval_id: 2
+    - datetime: '2026-08-29T23:00:00+02:00'
+      price_eur_kwh: 0.3102063
+      price_multiplier: 2.41
+      action: Stop
+      interval_id: 2
+    - datetime: '2026-08-29T23:15:00+02:00'
+      price_eur_kwh: 0.3019178
+      price_multiplier: 2.35
+      action: Stop
+      interval_id: 2
+    - datetime: '2026-08-29T23:30:00+02:00'
+      price_eur_kwh: 0.3060197
+      price_multiplier: 1.02
+      action: Stop
+      interval_id: 0
+    - datetime: '2026-08-29T23:45:00+02:00'
+      price_eur_kwh: 0.2991227
+      price_multiplier: 1
+      action: Stop
+      interval_id: 0
+  intervals: 3
+  min_profit_required_eur_kwh: 0.06
+  charge_quarters: 13
+  discharge_quarters: 13
+  price_delta_threshold_percent: 8
+  algorithm_type: whss
+  icon: mdi:battery-sync
+  friendly_name: Battery Optimizer Action

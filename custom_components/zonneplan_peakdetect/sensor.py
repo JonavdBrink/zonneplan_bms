@@ -225,41 +225,30 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         # Recalculate price_multiplier using windows partitioned by the algorithm-found intervals
         n = len(schedule)
         if n > 0:
-            # Find contiguous segments of non-negative interval_ids
-            segments = []
-            current_interval_id = None
-            start_idx = None
-            
+            # Find the end of each wave's active slots (Charge/Discharge)
+            last_active_indices = {}
             for idx, item in enumerate(schedule):
                 iid = item.get('interval_id', -1)
-                if iid >= 0:
-                    if iid != current_interval_id:
-                        if current_interval_id is not None:
-                            segments.append((start_idx, idx))
-                        current_interval_id = iid
-                        start_idx = idx
-                else:
-                    if current_interval_id is not None:
-                        segments.append((start_idx, idx))
-                        current_interval_id = None
-                        start_idx = None
-            
-            if current_interval_id is not None:
-                segments.append((start_idx, n))
+                if item.get('action') != ACTION_STOP:
+                    if iid >= 0:
+                        last_active_indices[iid] = idx
 
-            if not segments:
+            active_waves = sorted(last_active_indices.keys())
+
+            if not active_waves:
                 # Fallback to absolute minimum of the entire forecast if no active intervals are found
                 global_min = min(item['price_eur_kwh'] for item in schedule)
                 for item in schedule:
                     p = item['price_eur_kwh']
                     item['price_multiplier'] = round(p / global_min, 2) if global_min > 0 else round(1.0 + p / abs(global_min), 2) if global_min != 0 else 1.0
             else:
-                # Partition into windows anchored at the end of each wave segment
+                # Partition into windows anchored at the end of each active wave segment
                 windows = []
                 prev_end = 0
-                for start, end in segments:
-                    windows.append((prev_end, end))
-                    prev_end = end
+                for iid in active_waves:
+                    end_idx = last_active_indices[iid] + 1
+                    windows.append((prev_end, end_idx))
+                    prev_end = end_idx
                 
                 if windows:
                     # Extend the last window to cover the trailing part of the day
