@@ -178,3 +178,15 @@ async def test_sensor_price_multiplier_windowed(hass, freezer):
     # Verify index 18 (0.35): multiplier = 0.35 / 0.10 = 3.5
     assert schedule[18]["price_multiplier"] == 3.5
 
+    # Verify new sensor attributes for automation
+    assert state.attributes.get("current_price_multiplier") == 1.0  # multiplier of current interval (index 5)
+    quartiles = state.attributes.get("price_multiplier_quartiles")
+    assert quartiles is not None
+    assert "min" in quartiles
+    assert "q25" in quartiles
+    assert "q50" in quartiles
+    assert "q75" in quartiles
+    assert "max" in quartiles
+    assert quartiles["min"] == 1.0
+    assert quartiles["max"] == 6.0
+

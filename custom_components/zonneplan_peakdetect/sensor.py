@@ -112,6 +112,8 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
             "discharge_quarters": self._discharge_quarters,
             "price_delta_threshold_percent": self._price_delta_percent,
             "algorithm_type": self._algorithm_type,
+            "current_price_multiplier": 1.0,
+            "price_multiplier_quartiles": None,
         }
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry_id)},
@@ -298,10 +300,33 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                 if diff > 0:
                     interval_minutes = int(diff)
 
+        current_multiplier = 1.0
         for i in schedule:
             dt = _parse_datetime(i["datetime"])
             if dt and dt <= now < dt + timedelta(minutes=interval_minutes):
                 self._attr_native_value = i['action']
+                current_multiplier = i.get('price_multiplier', 1.0)
                 break
+
+        self._attr_extra_state_attributes['current_price_multiplier'] = current_multiplier
+
+        # Expose the statistical quartiles of the price multipliers over the entire scheduled forecast
+        multipliers = [i.get('price_multiplier', 1.0) for i in schedule]
+        if len(multipliers) >= 2:
+            import statistics
+            try:
+                q = statistics.quantiles(multipliers, n=4)
+                self._attr_extra_state_attributes['price_multiplier_quartiles'] = {
+                    'min': round(min(multipliers), 2),
+                    'q25': round(q[0], 2),
+                    'q50': round(q[1], 2),
+                    'q75': round(q[2], 2),
+                    'max': round(max(multipliers), 2)
+                }
+            except Exception as e:
+                LOGGER.warning("Failed to calculate price multiplier quartiles: %s", e)
+                self._attr_extra_state_attributes['price_multiplier_quartiles'] = None
+        else:
+            self._attr_extra_state_attributes['price_multiplier_quartiles'] = None
 
         LOGGER.debug("Current BESS action set to: %s", self._attr_native_value)
