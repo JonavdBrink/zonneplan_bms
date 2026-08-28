@@ -45,7 +45,6 @@ def calculate_hybrid_schedule(
             
     now = first_dt if first_dt else datetime.fromisoformat("2026-07-28T18:00:00")
     prepared_data = []
-    running_min = float('inf')
     
     for idx, item in enumerate(forecast_data):
         raw_dt = item.get('start_date') or item.get('datetime')
@@ -60,16 +59,13 @@ def calculate_hybrid_schedule(
         else:
             continue
             
-        if price < running_min:
-            running_min = price
-        
         dt = _parse_datetime(raw_dt)
         is_passed = dt < now if dt else False
 
         prepared_data.append({
             'datetime': raw_dt,
             'price_eur_kwh': price,
-            'price_multiplier': round(price / running_min, 2) if running_min > 0 else 1.0,
+            'price_multiplier': 1.0,
             'action': ACTION_STOP,
             'interval_id': -1 if is_passed else 0,
             'sort_index': idx
@@ -154,6 +150,63 @@ def calculate_hybrid_schedule(
             # Advance timeline by 1 step if no waves are found
             current_idx += 1
 
+    # Recalculate price_multiplier using windows partitioned by the algorithm-found intervals
+    n = len(prepared_data)
+    if n > 0:
+        # Find contiguous segments of non-negative interval_ids
+        segments = []
+        current_interval_id = None
+        start_idx = None
+        
+        for idx, item in enumerate(prepared_data):
+            iid = item.get('interval_id', -1)
+            # Since HSWAS segment starts with interval_count = 1 instead of 0, check iid >= 1 (or >= 0)
+            # Let's check >= 1 to be absolutely safe, or more generically >= 0 (since -1 is passed and 0 is default/passed)
+            # Actually, in dry_run_swa, interval_count starts at 1, so scheduled waves have iid >= 1, while default/passed have iid <= 0.
+            # Let's treat scheduled waves as iid >= 1.
+            if iid >= 1:
+                if iid != current_interval_id:
+                    if current_interval_id is not None:
+                        segments.append((start_idx, idx))
+                    current_interval_id = iid
+                    start_idx = idx
+            else:
+                if current_interval_id is not None:
+                    segments.append((start_idx, idx))
+                    current_interval_id = None
+                    start_idx = None
+        
+        if current_interval_id is not None:
+            segments.append((start_idx, n))
+
+        if not segments:
+            # Fallback to absolute minimum of the entire forecast if no active intervals are found
+            global_min = min(item['price_eur_kwh'] for item in prepared_data)
+            for item in prepared_data:
+                p = item['price_eur_kwh']
+                item['price_multiplier'] = round(p / global_min, 2) if global_min > 0 else round(1.0 + p / abs(global_min), 2) if global_min != 0 else 1.0
+        else:
+            # Partition into windows anchored at the end of each wave segment
+            windows = []
+            prev_end = 0
+            for start, end in segments:
+                windows.append((prev_end, end))
+                prev_end = end
+            
+            if windows:
+                # Extend the last window to cover the trailing part of the day
+                last_start, _ = windows[-1]
+                windows[-1] = (last_start, n)
+
+            # For each window, find its minimum price and calculate multipliers
+            for start, end in windows:
+                window_slice = prepared_data[start:end]
+                if window_slice:
+                    window_min = min(item['price_eur_kwh'] for item in window_slice)
+                    for item in window_slice:
+                        p = item['price_eur_kwh']
+                        item['price_multiplier'] = round(p / window_min, 2) if window_min > 0 else round(1.0 + p / abs(window_min), 2) if window_min != 0 else 1.0
+
     # Clean up temporary internal keys
     for item in prepared_data:
         item.pop('sort_index', None)
@@ -235,14 +288,14 @@ def main():
         price_delta_percent=price_delta_percent
     )
     
-    print("\n" + "=" * 80)
+    print("\n" + "=" * 90)
     print(" BESS HYBRID SWA-WAVE-SLOT (HSWAS) - TEST RESULTS")
-    print("=" * 80)
+    print("=" * 90)
     print(f"Total Intervals Segmented: {intervals}")
     print(f"Configuration: charge_quarters={charge_quarters}, discharge_quarters={discharge_quarters}, min_profit={min_profit}, price_delta_percent={price_delta_percent}")
-    print("-" * 80)
-    print(f"{'Datetime':<30} | {'Price (€/kWh)':<14} | {'Action':<10} | {'Interval ID':<11}")
-    print("-" * 80)
+    print("-" * 90)
+    print(f"{'Datetime':<30} | {'Price (€/kWh)':<14} | {'Multiplier':<11} | {'Action':<10} | {'Interval ID':<11}")
+    print("-" * 90)
 
     for item in schedule:
         action = item["action"]
@@ -254,9 +307,9 @@ def main():
             action_str = f"{action:<10}"
 
         print(
-            f"{item['datetime']:<30} | {item['price_eur_kwh']:<14.7f} | {action_str} | {item['interval_id']:<11}"
+            f"{item['datetime']:<30} | {item['price_eur_kwh']:<14.7f} | {item['price_multiplier']:<11.2f} | {action_str} | {item['interval_id']:<11}"
         )
-    print("=" * 80 + "\n")
+    print("=" * 90 + "\n")
 
 if __name__ == "__main__":
     main()

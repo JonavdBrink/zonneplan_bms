@@ -154,7 +154,6 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         # 1. Prepare Data
         now = dt_util.now()
         prepared_data = []
-        running_min = float('inf')
         for idx, item in enumerate(forecast_data):
             # Backwards-compatible format extraction (supporting both old and new schema)
             raw_dt = item.get('start_date')
@@ -180,16 +179,13 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                 LOGGER.warning("Incomplete forecast data (missing price) at index %d: %s", idx, item)
                 continue
                 
-            if price < running_min:
-                running_min = price
-            
             dt = _parse_datetime(raw_dt)
             is_passed = dt < now if dt else False
 
             prepared_data.append({
                 'datetime': raw_dt,
                 'price_eur_kwh': price,
-                'price_multiplier': round(price / running_min, 2) if running_min > 0 else round(1.0 + price / abs(running_min), 2) if running_min != 0 else 1.0,
+                'price_multiplier': 1.0,
                 'action': ACTION_STOP,
                 'interval_id': -1 if is_passed else 0,
                 'sort_index': idx
@@ -226,6 +222,59 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
             now
         )
         
+        # Recalculate price_multiplier using windows partitioned by the algorithm-found intervals
+        n = len(schedule)
+        if n > 0:
+            # Find contiguous segments of non-negative interval_ids
+            segments = []
+            current_interval_id = None
+            start_idx = None
+            
+            for idx, item in enumerate(schedule):
+                iid = item.get('interval_id', -1)
+                if iid >= 0:
+                    if iid != current_interval_id:
+                        if current_interval_id is not None:
+                            segments.append((start_idx, idx))
+                        current_interval_id = iid
+                        start_idx = idx
+                else:
+                    if current_interval_id is not None:
+                        segments.append((start_idx, idx))
+                        current_interval_id = None
+                        start_idx = None
+            
+            if current_interval_id is not None:
+                segments.append((start_idx, n))
+
+            if not segments:
+                # Fallback to absolute minimum of the entire forecast if no active intervals are found
+                global_min = min(item['price_eur_kwh'] for item in schedule)
+                for item in schedule:
+                    p = item['price_eur_kwh']
+                    item['price_multiplier'] = round(p / global_min, 2) if global_min > 0 else round(1.0 + p / abs(global_min), 2) if global_min != 0 else 1.0
+            else:
+                # Partition into windows anchored at the end of each wave segment
+                windows = []
+                prev_end = 0
+                for start, end in segments:
+                    windows.append((prev_end, end))
+                    prev_end = end
+                
+                if windows:
+                    # Extend the last window to cover the trailing part of the day
+                    last_start, _ = windows[-1]
+                    windows[-1] = (last_start, n)
+
+                # For each window, find its minimum price and calculate multipliers
+                for start, end in windows:
+                    window_slice = schedule[start:end]
+                    if window_slice:
+                        window_min = min(item['price_eur_kwh'] for item in window_slice)
+                        for item in window_slice:
+                            p = item['price_eur_kwh']
+                            item['price_multiplier'] = round(p / window_min, 2) if window_min > 0 else round(1.0 + p / abs(window_min), 2) if window_min != 0 else 1.0
+
         # Read total interval count directly from scheduled data attributes
         intervals = len(set(h['interval_id'] for h in schedule if h.get('interval_id', -1) >= 0))
         self._attr_extra_state_attributes['intervals'] = intervals
