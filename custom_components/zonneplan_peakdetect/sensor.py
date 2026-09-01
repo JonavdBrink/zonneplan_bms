@@ -50,7 +50,15 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: Any, async_add_en
         discharge_quarters = config.get("discharge_hours", 2) * 4
 
     price_delta_percent = config.get(CONF_RTE_PERCENT)
+    if price_delta_percent is None:
+        price_delta_percent = config.get("price_delta_threshold_percent")
+    if price_delta_percent is None:
+        price_delta_percent = DEFAULT_PERCENTAGE
+
     min_profit_c_kwh = config.get(CONF_MIN_PROFIT)
+    if min_profit_c_kwh is None:
+        min_profit_c_kwh = DEFAULT_CENTS
+
     algorithm_type = config.get(CONF_ALGORITHM, DEFAULT_ALGORITHM)
 
     async_add_entities([
