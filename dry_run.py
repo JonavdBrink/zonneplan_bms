@@ -64,7 +64,7 @@ def calculate_action_schedule(
             'price_eur_kwh': price,
             'price_multiplier': 1.0,
             'action': ACTION_STOP,
-            'interval_id': -1 if is_passed else 0,
+            'interval_id': -1,
             'sort_index': idx
         })
 
@@ -78,7 +78,7 @@ def calculate_action_schedule(
     n = len(prepared_data)
     current_idx = 0
     interval_count = 0
-    
+
     while current_idx < n - 1:
         # Step A: Find local valley
         valley_idx = current_idx
@@ -150,82 +150,128 @@ def calculate_action_schedule(
             continue
 
         # Process if profit threshold is met, taking round-trip efficiency into account
+        is_profitable = False
         if (peak_max * rte_factor - valley_min) >= min_profit_eur_kwh:                
             # CHARGE: Select cheapest hours before valley
             charge_cands = [h for h in segment if h['sort_index'] < valley_idx and peak_max * rte_factor - h['price_eur_kwh'] >= min_profit_eur_kwh ]
             charge_cands.sort(key=lambda x: x['price_eur_kwh'])
-            if not charge_cands:
-                current_idx = segment_end
-                continue
-            charge_slots = charge_cands[:charge_slots_count]
-                            
-            # DISCHARGE: Select most expensive hours after valley
-            discharge_cands = [h for h in segment if h['sort_index'] >= valley_idx and h['price_eur_kwh'] * rte_factor - valley_min >= min_profit_eur_kwh]
-            discharge_cands.sort(key=lambda x: x['price_eur_kwh'], reverse=True)
-            if not discharge_cands:
-                current_idx = segment_end
-                continue
-            discharge_slots = discharge_cands[:discharge_slots_count]
+            if charge_cands:
+                charge_slots = charge_cands[:charge_slots_count]
+                                
+                # DISCHARGE: Select most expensive hours after valley
+                discharge_cands = [h for h in segment if h['sort_index'] >= valley_idx and h['price_eur_kwh'] * rte_factor - valley_min >= min_profit_eur_kwh]
+                discharge_cands.sort(key=lambda x: x['price_eur_kwh'], reverse=True)
+                if discharge_cands:
+                    discharge_slots = discharge_cands[:discharge_slots_count]
 
-            # Balance charge and discharge slots
-            num_slots = min(len(charge_slots), len(discharge_slots))
-            charge_slots = charge_slots[:num_slots]
-            discharge_slots = discharge_slots[:num_slots]
+                    # Balance charge and discharge slots
+                    num_slots = min(len(charge_slots), len(discharge_slots))
+                    charge_slots = charge_slots[:num_slots]
+                    discharge_slots = discharge_slots[:num_slots]
 
-            for s in segment:
-                s['interval_id'] = interval_count
+                    if len(charge_slots) > 0 and len(discharge_slots) > 0:
+                        for s in segment:
+                            s['interval_id'] = interval_count
 
-            for s in charge_slots:
-                s['action'] = ACTION_CHARGE
-                            
-            for s in discharge_slots:
-                s['action'] = ACTION_DISCHARGE
-            
-            interval_count += 1
+                        for s in charge_slots:
+                            s['action'] = ACTION_CHARGE
+                                        
+                        for s in discharge_slots:
+                            s['action'] = ACTION_DISCHARGE
+                        
+                        interval_count += 1
         
         current_idx = segment_end
 
-    # Recalculate price_multiplier using windows partitioned by the algorithm-found intervals
+    # Recalculate price_multiplier using continuous linear interpolation of divisors between wave valleys
     n = len(prepared_data)
     if n > 0:
-        # Find the end of each wave's active slots (Charge/Discharge)
-        last_active_indices = {}
+        # 1. Find the valley index and price for each active wave (interval_id >= 0)
+        valleys = {}
         for idx, item in enumerate(prepared_data):
             iid = item.get('interval_id', -1)
             if item.get('action') != ACTION_STOP:
                 if iid >= 0:
-                    last_active_indices[iid] = idx
-
-        active_waves = sorted(last_active_indices.keys())
-
-        if not active_waves:
-            # Fallback to absolute minimum of the entire forecast if no active intervals are found
+                    price = item['price_eur_kwh']
+                    if iid not in valleys or price < valleys[iid]['price']:
+                        valleys[iid] = {'idx': idx, 'price': price}
+        
+        # Sort waves to ensure correct chronological sequence
+        active_wave_ids = sorted(valleys.keys())
+        
+        if not active_wave_ids:
+            # Fallback to absolute minimum of the entire forecast if no active waves are found
             global_min = min(item['price_eur_kwh'] for item in prepared_data)
             for item in prepared_data:
                 p = item['price_eur_kwh']
                 item['price_multiplier'] = round(p / global_min, 2) if global_min > 0 else round(1.0 + p / abs(global_min), 2) if global_min != 0 else 1.0
+                item['interval_id'] = -1
         else:
-            # Partition into windows anchored at the end of each active wave segment
-            windows = []
-            prev_end = 0
-            for iid in active_waves:
-                end_idx = last_active_indices[iid] + 1
-                windows.append((prev_end, end_idx))
-                prev_end = end_idx
-            
-            if windows:
-                # Extend the last window to cover the trailing part of the day
-                last_start, _ = windows[-1]
-                windows[-1] = (last_start, n)
+            # 2. Assign interval_id to all items based on closest wave's midpoint partition
+            if len(active_wave_ids) == 1:
+                single_id = active_wave_ids[0]
+                for item in prepared_data:
+                    item['interval_id'] = single_id
+            else:
+                midpoints = []
+                for k in range(len(active_wave_ids) - 1):
+                    idx_a = valleys[active_wave_ids[k]]['idx']
+                    idx_b = valleys[active_wave_ids[k+1]]['idx']
+                    midpoints.append((idx_a + idx_b) // 2)
+                
+                for idx, item in enumerate(prepared_data):
+                    assigned_id = active_wave_ids[-1]
+                    for k in range(len(midpoints)):
+                        if idx <= midpoints[k]:
+                            assigned_id = active_wave_ids[k]
+                            break
+                    item['interval_id'] = assigned_id
 
-            # For each window, find its minimum price and calculate multipliers
-            for start, end in windows:
-                window_slice = prepared_data[start:end]
-                if window_slice:
-                    window_min = min(item['price_eur_kwh'] for item in window_slice)
-                    for item in window_slice:
-                        p = item['price_eur_kwh']
-                        item['price_multiplier'] = round(p / window_min, 2) if window_min > 0 else round(1.0 + p / abs(window_min), 2) if window_min != 0 else 1.0
+            # 3. Calculate divisor for each interval in the timeline
+            anchors = [(valleys[iid]['idx'], valleys[iid]['price']) for iid in active_wave_ids]
+            
+            for idx, item in enumerate(prepared_data):
+                p = item['price_eur_kwh']
+                
+                # If before the first valley, lock to first valley price
+                if idx <= anchors[0][0]:
+                    divisor = anchors[0][1]
+                # If after the last valley, lock to last valley price
+                elif idx >= anchors[-1][0]:
+                    divisor = anchors[-1][1]
+                # If in between two valleys, linearly interpolate
+                else:
+                    # Find the two bounding valleys
+                    for k in range(len(anchors) - 1):
+                        idx_a, price_a = anchors[k]
+                        idx_b, price_b = anchors[k+1]
+                        if idx_a <= idx <= idx_b:
+                            # Interpolation fraction
+                            f = (idx - idx_a) / (idx_b - idx_a)
+                            divisor = (1.0 - f) * price_a + f * price_b
+                            break
+                
+                # Compute multiplier
+                item['price_multiplier'] = round(p / divisor, 2) if divisor > 0 else round(1.0 + p / abs(divisor), 2) if divisor != 0 else 1.0
+
+        # Assign price_multiplier_quartile (1, 2, 3, 4) to each interval
+        multipliers = [item.get('price_multiplier', 1.0) for item in prepared_data]
+        if len(multipliers) >= 2:
+            import statistics
+            try:
+                q = statistics.quantiles(multipliers, n=4)
+                for item in prepared_data:
+                    m = item.get('price_multiplier', 1.0)
+                    if m <= q[0]:
+                        item['price_multiplier_quartile'] = 1
+                    elif m <= q[1]:
+                        item['price_multiplier_quartile'] = 2
+                    elif m <= q[2]:
+                        item['price_multiplier_quartile'] = 3
+                    else:
+                        item['price_multiplier_quartile'] = 4
+            except Exception:
+                pass
 
     # Cleanup internal keys
     for item in prepared_data:
@@ -511,14 +557,43 @@ def main():
         price_delta_percent=price_delta_percent
     )
     
-    print("\n" + "=" * 90)
+    active_intervals = len(set(item['interval_id'] for item in schedule if item.get('interval_id', -1) >= 0 and item.get('action') != ACTION_STOP))
+
+    # Calculate quartiles fixed per interval_id
+    from collections import defaultdict
+    iid_multipliers = defaultdict(list)
+    for item in schedule:
+        iid = item.get('interval_id', -1)
+        iid_multipliers[iid].append(item.get('price_multiplier', 1.0))
+        
+    iid_quartiles = {}
+    for iid, mults in iid_multipliers.items():
+        min_val, max_val = 1.0, 1.0
+        q25, q50, q75 = 1.0, 1.0, 1.0
+        if len(mults) >= 2:
+            import statistics
+            try:
+                q = statistics.quantiles(mults, n=4)
+                min_val = min(mults)
+                max_val = max(mults)
+                q25 = q[0]
+                q50 = q[1]
+                q75 = q[2]
+            except Exception:
+                pass
+        elif len(mults) == 1:
+            min_val = max_val = q25 = q50 = q75 = mults[0]
+        
+        iid_quartiles[iid] = f"[{min_val:.2f}, {q25:.2f}, {q50:.2f}, {q75:.2f}, {max_val:.2f}]"
+
+    print("\n" + "=" * 120)
     print(" BESS ARBITRAGE SCHEDULER - ALGORITHM TEST RESULTS")
-    print("=" * 90)
-    print(f"Total Intervals Segmented: {intervals}")
+    print("=" * 120)
+    print(f"Total Intervals Segmented: {active_intervals}")
     print(f"Configuration: charge_quarters={charge_quarters}, discharge_quarters={discharge_quarters}, min_profit={min_profit}, price_delta_percent={price_delta_percent}")
-    print("-" * 90)
-    print(f"{'Datetime':<30} | {'Price (€/kWh)':<14} | {'Multiplier':<11} | {'Action':<10} | {'Interval ID':<11}")
-    print("-" * 90)
+    print("-" * 120)
+    print(f"{'Datetime':<30} | {'Price (€/kWh)':<14} | {'Multiplier':<11} | {'Quartiles (Min-Max)':<30} | {'Action':<10} | {'Interval ID':<11}")
+    print("-" * 120)
 
     for item in schedule:
         action = item["action"]
@@ -529,10 +604,13 @@ def main():
         else:
             action_str = f"{action:<10}"
 
+        iid = item.get('interval_id', -1)
+        q_str = iid_quartiles.get(iid, "[1.00, 1.00, 1.00, 1.00, 1.00]")
+
         print(
-            f"{item['datetime']:<30} | {item['price_eur_kwh']:<14.7f} | {item['price_multiplier']:<11.2f} | {action_str} | {item['interval_id']:<11}"
+            f"{item['datetime']:<30} | {item['price_eur_kwh']:<14.7f} | {item['price_multiplier']:<11.2f} | {q_str:<30} | {action_str} | {item['interval_id']:<11}"
         )
-    print("=" * 90 + "\n")
+    print("=" * 120 + "\n")
 
 if __name__ == "__main__":
     main()

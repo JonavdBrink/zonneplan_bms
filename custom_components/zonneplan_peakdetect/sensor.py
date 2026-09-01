@@ -189,7 +189,7 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                 'price_eur_kwh': price,
                 'price_multiplier': 1.0,
                 'action': ACTION_STOP,
-                'interval_id': -1 if is_passed else 0,
+                'interval_id': -1,
                 'sort_index': idx
             })
 
@@ -224,50 +224,79 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
             now
         )
         
-        # Recalculate price_multiplier using windows partitioned by the algorithm-found intervals
+        # Recalculate price_multiplier using continuous linear interpolation of divisors between wave valleys
         n = len(schedule)
         if n > 0:
-            # Find the end of each wave's active slots (Charge/Discharge)
-            last_active_indices = {}
+            # 1. Find the valley index and price for each active wave (interval_id >= 0)
+            valleys = {}
             for idx, item in enumerate(schedule):
                 iid = item.get('interval_id', -1)
                 if item.get('action') != ACTION_STOP:
                     if iid >= 0:
-                        last_active_indices[iid] = idx
-
-            active_waves = sorted(last_active_indices.keys())
-
-            if not active_waves:
-                # Fallback to absolute minimum of the entire forecast if no active intervals are found
+                        price = item['price_eur_kwh']
+                        if iid not in valleys or price < valleys[iid]['price']:
+                            valleys[iid] = {'idx': idx, 'price': price}
+            
+            # Sort waves to ensure correct chronological sequence
+            active_wave_ids = sorted(valleys.keys())
+            
+            if not active_wave_ids:
+                # Fallback to absolute minimum of the entire forecast if no active waves are found
                 global_min = min(item['price_eur_kwh'] for item in schedule)
                 for item in schedule:
                     p = item['price_eur_kwh']
                     item['price_multiplier'] = round(p / global_min, 2) if global_min > 0 else round(1.0 + p / abs(global_min), 2) if global_min != 0 else 1.0
+                    item['interval_id'] = -1
             else:
-                # Partition into windows anchored at the end of each active wave segment
-                windows = []
-                prev_end = 0
-                for iid in active_waves:
-                    end_idx = last_active_indices[iid] + 1
-                    windows.append((prev_end, end_idx))
-                    prev_end = end_idx
+                # 2. Assign interval_id to all items based on closest wave's midpoint partition
+                if len(active_wave_ids) == 1:
+                    single_id = active_wave_ids[0]
+                    for item in schedule:
+                        item['interval_id'] = single_id
+                else:
+                    midpoints = []
+                    for k in range(len(active_wave_ids) - 1):
+                        idx_a = valleys[active_wave_ids[k]]['idx']
+                        idx_b = valleys[active_wave_ids[k+1]]['idx']
+                        midpoints.append((idx_a + idx_b) // 2)
+                    
+                    for idx, item in enumerate(schedule):
+                        assigned_id = active_wave_ids[-1]
+                        for k in range(len(midpoints)):
+                            if idx <= midpoints[k]:
+                                assigned_id = active_wave_ids[k]
+                                break
+                        item['interval_id'] = assigned_id
+
+                # 3. Calculate divisor for each interval in the timeline
+                anchors = [(valleys[iid]['idx'], valleys[iid]['price']) for iid in active_wave_ids]
                 
-                if windows:
-                    # Extend the last window to cover the trailing part of the day
-                    last_start, _ = windows[-1]
-                    windows[-1] = (last_start, n)
+                for idx, item in enumerate(schedule):
+                    p = item['price_eur_kwh']
+                    
+                    # If before the first valley, lock to first valley price
+                    if idx <= anchors[0][0]:
+                        divisor = anchors[0][1]
+                    # If after the last valley, lock to last valley price
+                    elif idx >= anchors[-1][0]:
+                        divisor = anchors[-1][1]
+                    # If in between two valleys, linearly interpolate
+                    else:
+                        # Find the two bounding valleys
+                        for k in range(len(anchors) - 1):
+                            idx_a, price_a = anchors[k]
+                            idx_b, price_b = anchors[k+1]
+                            if idx_a <= idx <= idx_b:
+                                # Interpolation fraction
+                                f = (idx - idx_a) / (idx_b - idx_a)
+                                divisor = (1.0 - f) * price_a + f * price_b
+                                break
+                    
+                    # Compute multiplier
+                    item['price_multiplier'] = round(p / divisor, 2) if divisor > 0 else round(1.0 + p / abs(divisor), 2) if divisor != 0 else 1.0
 
-                # For each window, find its minimum price and calculate multipliers
-                for start, end in windows:
-                    window_slice = schedule[start:end]
-                    if window_slice:
-                        window_min = min(item['price_eur_kwh'] for item in window_slice)
-                        for item in window_slice:
-                            p = item['price_eur_kwh']
-                            item['price_multiplier'] = round(p / window_min, 2) if window_min > 0 else round(1.0 + p / abs(window_min), 2) if window_min != 0 else 1.0
-
-        # Read total interval count directly from scheduled data attributes
-        intervals = len(set(h['interval_id'] for h in schedule if h.get('interval_id', -1) >= 0))
+        # Read total active interval count directly from scheduled data attributes
+        intervals = len(set(h['interval_id'] for h in schedule if h.get('interval_id', -1) >= 0 and h.get('action') != ACTION_STOP))
         self._attr_extra_state_attributes['intervals'] = intervals
 
         # Remove helper key before returning

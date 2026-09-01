@@ -163,23 +163,23 @@ async def test_sensor_price_multiplier_windowed(hass, freezer):
     assert len(schedule) == 24
 
     # Wave 1 window (indices 0 to 11): min price = 0.05
-    # Verify index 0 (0.20): multiplier = 0.20 / 0.05 = 4.0
+    # Verify index 0 (0.20): multiplier = 0.20 / 0.05 = 4.0 (locked to Valley 1 before center)
     assert schedule[0]["price_multiplier"] == 4.0
-    # Verify index 4 (0.05): multiplier = 0.05 / 0.05 = 1.0
+    # Verify index 4 (0.05): multiplier = 0.05 / 0.05 = 1.0 (Valley 1 center)
     assert schedule[4]["price_multiplier"] == 1.0
-    # Verify index 8 (0.30): multiplier = 0.30 / 0.05 = 6.0
-    assert schedule[8]["price_multiplier"] == 6.0
+    # Verify index 8 (0.30): multiplier = 0.30 / 0.07 = 4.29 (linearly interpolated divisor 0.07 between 0.05 and 0.10)
+    assert schedule[8]["price_multiplier"] == 4.29
 
     # Wave 2 window (indices 12 to 23): min price = 0.10
-    # Verify index 12 (0.25): multiplier = 0.25 / 0.10 = 2.5
-    assert schedule[12]["price_multiplier"] == 2.5
-    # Verify index 14 (0.10): multiplier = 0.10 / 0.10 = 1.0
+    # Verify index 12 (0.25): multiplier = 0.25 / 0.09 = 2.78 (linearly interpolated divisor 0.09 between 0.05 and 0.10)
+    assert schedule[12]["price_multiplier"] == 2.78
+    # Verify index 14 (0.10): multiplier = 0.10 / 0.10 = 1.0 (Valley 2 center)
     assert schedule[14]["price_multiplier"] == 1.0
-    # Verify index 18 (0.35): multiplier = 0.35 / 0.10 = 3.5
+    # Verify index 18 (0.35): multiplier = 0.35 / 0.10 = 3.5 (locked to Valley 2 after center)
     assert schedule[18]["price_multiplier"] == 3.5
 
     # Verify new sensor attributes for automation
-    assert state.attributes.get("current_price_multiplier") == 1.0  # multiplier of current interval (index 5)
+    assert state.attributes.get("current_price_multiplier") == 0.91  # multiplier of current interval (index 5)
     quartiles = state.attributes.get("price_multiplier_quartiles")
     assert quartiles is not None
     assert "min" in quartiles
@@ -187,6 +187,6 @@ async def test_sensor_price_multiplier_windowed(hass, freezer):
     assert "q50" in quartiles
     assert "q75" in quartiles
     assert "max" in quartiles
-    assert quartiles["min"] == 1.0
-    assert quartiles["max"] == 6.0
+    assert quartiles["min"] == 0.91
+    assert quartiles["max"] == 4.29
 
