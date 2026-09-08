@@ -4,6 +4,7 @@
       "user": {
         "data": {
           "algorithm_type": "Algoritme",
+          "multiplier_type": "Multiplier-basismethode",
           "price_delta_percent": "Prijsverschil drempelpercentage",
           "min_profit_c_kwh": "Minimaal vereiste winst (cent/kWh)",
           "charge_quarters": "Laad kwartieren (15-min intervallen)",
@@ -15,6 +16,7 @@
       "reconfigure": {
         "data": {
           "algorithm_type": "Algoritme",
+          "multiplier_type": "Multiplier-basismethode",
           "price_delta_percent": "Prijsverschil drempelpercentage",
           "min_profit_c_kwh": "Minimaal vereiste winst (cent/kWh)",
           "charge_quarters": "Laad kwartieren (15-min intervallen)",
@@ -29,7 +31,14 @@
     "algorithm_type": {
       "options": {
         "whss": "Standaard (WHSS)",
-        "hswas": "Geavanceerd (HSWAS) [β]"
+        "hswas": "Geavanceerd (HSWAS) [β]",
+        "mpes": "Middelpunt Extrema (MPES) [β]"
+      }
+    },
+    "multiplier_type": {
+      "options": {
+        "cpwl": "Continue Vallei-interpolatie (CPWL)",
+        "block": "Blokgebaseerde Partitionering"
       }
     }
   }

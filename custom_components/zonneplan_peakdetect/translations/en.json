@@ -6,6 +6,7 @@
         "title": "Configure Zonneplan Peak Detection",
         "data": {
           "algorithm_type": "Algorithm",
+          "multiplier_type": "Multiplier baseline algorithm",
           "price_delta_percent": "Price delta threshold percentage",
           "min_profit_c_kwh": "Minimum profit required (cents/kWh)",
           "charge_quarters": "Charge quarters (15-min intervals)",
@@ -18,6 +19,7 @@
         "title": "Reconfigure Zonneplan Peak Detection",
         "data": {
           "algorithm_type": "Algorithm",
+          "multiplier_type": "Multiplier baseline algorithm",
           "price_delta_percent": "Price delta threshold percentage",
           "min_profit_c_kwh": "Minimum profit required (cents/kWh)",
           "charge_quarters": "Charge quarters (15-min intervals)",
@@ -32,7 +34,14 @@
     "algorithm_type": {
       "options": {
         "whss": "Standard (WHSS)",
-        "hswas": "Advanced (HSWAS) [β]"
+        "hswas": "Advanced (HSWAS) [β]",
+        "mpes": "Midpoint Extrema (MPES) [β]"
+      }
+    },
+    "multiplier_type": {
+      "options": {
+        "cpwl": "Continuous Valley Interpolation (CPWL)",
+        "block": "Block-Based Partitioning"
       }
     }
   }

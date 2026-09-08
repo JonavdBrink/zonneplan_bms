@@ -1,15 +1,18 @@
 from .base import ArbitrageStrategy
 from .wave_heuristic import WhssStrategy
 from .sliding_window import HswasStrategy
+from .mpes import MpesStrategy
 from ..const import (
     ALGORITHM_WHSS,
     ALGORITHM_HSWAS,
+    ALGORITHM_MPES,
 )
 
 # Registry mapping configuration keys to strategy classes
 STRATEGIES: dict[str, type[ArbitrageStrategy]] = {
     ALGORITHM_WHSS: WhssStrategy,
     ALGORITHM_HSWAS: HswasStrategy,
+    ALGORITHM_MPES: MpesStrategy,
 }
 
 def get_arbitrage_strategy(algorithm_type: str) -> ArbitrageStrategy:

@@ -16,14 +16,19 @@ from .const import (
     CONF_MIN_PROFIT,
     CONF_RTE_PERCENT,
     CONF_ALGORITHM,
+    CONF_MULTIPLIER_ALGORITHM,
     ALGORITHM_WHSS,
     ALGORITHM_HSWAS,
+    ALGORITHM_MPES,
+    MULTIPLIER_CPWL,
+    MULTIPLIER_BLOCK,
     DEFAULT_CENTS,
     DEFAULT_CHARGE_QUARTERS,
     DEFAULT_DISCHARGE_QUARTERS,
     DEFAULT_FORECAST_ENTITY,
     DEFAULT_PERCENTAGE,
     DEFAULT_ALGORITHM,
+    DEFAULT_MULTIPLIER_ALGORITHM,
     DOMAIN,
 )
 
@@ -55,7 +60,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             vol.Required(
                 CONF_ALGORITHM,
                 default=user_input.get(CONF_ALGORITHM, DEFAULT_ALGORITHM)
-            ): vol.In([ALGORITHM_WHSS, ALGORITHM_HSWAS]),
+            ): vol.In([ALGORITHM_WHSS, ALGORITHM_HSWAS, ALGORITHM_MPES]),
+            vol.Required(
+                CONF_MULTIPLIER_ALGORITHM,
+                default=user_input.get(CONF_MULTIPLIER_ALGORITHM, DEFAULT_MULTIPLIER_ALGORITHM)
+            ): vol.In([MULTIPLIER_CPWL, MULTIPLIER_BLOCK]),
             vol.Required(
                 CONF_RTE_PERCENT, 
                 default=user_input.get(CONF_RTE_PERCENT, DEFAULT_PERCENTAGE)

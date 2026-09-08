@@ -21,7 +21,11 @@ from .const import (
     CONF_MIN_PROFIT,
     CONF_RTE_PERCENT,
     CONF_ALGORITHM,
+    CONF_MULTIPLIER_ALGORITHM,
     DEFAULT_ALGORITHM,
+    DEFAULT_MULTIPLIER_ALGORITHM,
+    MULTIPLIER_CPWL,
+    MULTIPLIER_BLOCK,
     DOMAIN,
     LOGGER,
 )
@@ -60,6 +64,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: Any, async_add_en
         min_profit_c_kwh = DEFAULT_CENTS
 
     algorithm_type = config.get(CONF_ALGORITHM, DEFAULT_ALGORITHM)
+    multiplier_type = config.get(CONF_MULTIPLIER_ALGORITHM, DEFAULT_MULTIPLIER_ALGORITHM)
 
     async_add_entities([
         BatteryOptimizerSensor(
@@ -70,6 +75,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: Any, async_add_en
             price_delta_percent,
             min_profit_c_kwh,
             algorithm_type,
+            multiplier_type,
             SENSOR_DESCRIPTION
         )
     ], True)
@@ -98,6 +104,7 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         price_delta_percent: float,
         min_profit_c_kwh: float,
         algorithm_type: str,
+        multiplier_type: str,
         description: SensorEntityDescription
     ) -> None:
         """Initialize the sensor."""
@@ -109,6 +116,7 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         self._discharge_quarters = discharge_quarters
         self._price_delta_percent = price_delta_percent
         self._algorithm_type = algorithm_type
+        self._multiplier_type = multiplier_type
         # Convert minimal profit from cents/kWh to €/kWh
         self._min_profit_eur_kwh = min_profit_c_kwh / 100.0
         self._attr_native_value = ACTION_STOP
@@ -120,6 +128,7 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
             "discharge_quarters": self._discharge_quarters,
             "price_delta_threshold_percent": self._price_delta_percent,
             "algorithm_type": self._algorithm_type,
+            "multiplier_type": self._multiplier_type,
             "current_price_multiplier": 1.0,
             "price_multiplier_quartiles": None,
         }
@@ -277,31 +286,55 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                         item['interval_id'] = assigned_id
 
                 # 3. Calculate divisor for each interval in the timeline
-                anchors = [(valleys[iid]['idx'], valleys[iid]['price']) for iid in active_wave_ids]
-                
-                for idx, item in enumerate(schedule):
-                    p = item['price_eur_kwh']
+                if self._multiplier_type == MULTIPLIER_BLOCK:
+                    # Partition into windows anchored at the end of each active wave segment
+                    windows = []
+                    prev_end = 0
+                    for iid in active_wave_ids:
+                        active_indices = [idx for idx, item in enumerate(schedule) if item.get('interval_id', -1) == iid and item.get('action') != ACTION_STOP]
+                        end_idx = (max(active_indices) + 1) if active_indices else n
+                        windows.append((prev_end, end_idx))
+                        prev_end = end_idx
                     
-                    # If before the first valley, lock to first valley price
-                    if idx <= anchors[0][0]:
-                        divisor = anchors[0][1]
-                    # If after the last valley, lock to last valley price
-                    elif idx >= anchors[-1][0]:
-                        divisor = anchors[-1][1]
-                    # If in between two valleys, linearly interpolate
-                    else:
-                        # Find the two bounding valleys
-                        for k in range(len(anchors) - 1):
-                            idx_a, price_a = anchors[k]
-                            idx_b, price_b = anchors[k+1]
-                            if idx_a <= idx <= idx_b:
-                                # Interpolation fraction
-                                f = (idx - idx_a) / (idx_b - idx_a)
-                                divisor = (1.0 - f) * price_a + f * price_b
-                                break
+                    if windows:
+                        # Extend the last window to cover the trailing part of the day
+                        last_start, _ = windows[-1]
+                        windows[-1] = (last_start, n)
+
+                    # For each window, find its minimum price and calculate multipliers
+                    for start, end in windows:
+                        window_slice = schedule[start:end]
+                        if window_slice:
+                            window_min = min(item['price_eur_kwh'] for item in window_slice)
+                            for item in window_slice:
+                                p = item['price_eur_kwh']
+                                item['price_multiplier'] = round(p / window_min, 2) if window_min > 0 else round(1.0 + p / abs(window_min), 2) if window_min != 0 else 1.0
+                else: # MULTIPLIER_CPWL
+                    anchors = [(valleys[iid]['idx'], valleys[iid]['price']) for iid in active_wave_ids]
                     
-                    # Compute multiplier
-                    item['price_multiplier'] = round(p / divisor, 2) if divisor > 0 else round(1.0 + p / abs(divisor), 2) if divisor != 0 else 1.0
+                    for idx, item in enumerate(schedule):
+                        p = item['price_eur_kwh']
+                        
+                        # If before the first valley, lock to first valley price
+                        if idx <= anchors[0][0]:
+                            divisor = anchors[0][1]
+                        # If after the last valley, lock to last valley price
+                        elif idx >= anchors[-1][0]:
+                            divisor = anchors[-1][1]
+                        # If in between two valleys, linearly interpolate
+                        else:
+                            # Find the two bounding valleys
+                            for k in range(len(anchors) - 1):
+                                idx_a, price_a = anchors[k]
+                                idx_b, price_b = anchors[k+1]
+                                if idx_a <= idx <= idx_b:
+                                    # Interpolation fraction
+                                    f = (idx - idx_a) / (idx_b - idx_a)
+                                    divisor = (1.0 - f) * price_a + f * price_b
+                                    break
+                        
+                        # Compute multiplier
+                        item['price_multiplier'] = round(p / divisor, 2) if divisor > 0 else round(1.0 + p / abs(divisor), 2) if divisor != 0 else 1.0
 
         # Read total active interval count directly from scheduled data attributes
         intervals = len(set(h['interval_id'] for h in schedule if h.get('interval_id', -1) >= 0 and h.get('action') != ACTION_STOP))

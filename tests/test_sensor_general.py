@@ -8,6 +8,8 @@ from custom_components.zonneplan_peakdetect.const import (
     CONF_RTE_PERCENT,
     CONF_FORECAST_ENTITY,
     CONF_ALGORITHM,
+    CONF_MULTIPLIER_ALGORITHM,
+    MULTIPLIER_CPWL,
     ALGORITHM_WHSS,
 )
 
@@ -110,6 +112,7 @@ async def test_sensor_price_multiplier_windowed(hass, freezer):
         data={
             CONF_FORECAST_ENTITY: "sensor.zonneplan_forecast",
             CONF_ALGORITHM: ALGORITHM_WHSS,
+            CONF_MULTIPLIER_ALGORITHM: MULTIPLIER_CPWL,
             "charge_hours": 1.0,       # 4 quarters (1 hour)
             "discharge_hours": 1.0,    # 4 quarters (1 hour)
             CONF_RTE_PERCENT: 0.0,     # No efficiency loss to keep math simple

@@ -53,13 +53,22 @@ The **Advanced (HSWAS) [β]** algorithm is our cutting-edge, opt-in optimization
 
 ---
 
+### 3. Midpoint-Partition Extrema Strategy (MPES) [β]
+The **Midpoint-Partition Extrema Strategy (MPES) [β]** is our premier, mathematically optimal optimization algorithm designed specifically to conquer "duck curve" solar price profiles and eliminate wave-splitting errors:
+
+1. **Global Schmitt-Trigger Swing Filter**: Rather than stepping through the day chronologically, it applies a global swing filter with a hysteresis threshold (set at `1.2 * min_profit`) to detect major price valleys and peaks. Any minor midday fluctuations or high-frequency price "noise" are dynamically merged and smoothed out.
+2. **Temporal Midpoint Partitioning**: Once true peaks and valleys are paired, it calculates the temporal midpoint between each pair. This midpoint acts as a clean, unbreakable chronological boundary between the charging phase (before midpoint) and the discharging phase (after midpoint).
+3. **Extrema-Centered Slot Allocation**: Discards the artificial constraint of only charging *strictly before* the valley minimum. It centers slot-picking directly on the true valley (for charging) and the subsequent true peak (for discharging), picking the absolute cheapest and most expensive slots available in the segment. It is 100% chronologically safe, highly stable, and fully optimized for maximum yield on daily solar profiles.
+
+---
+
 ## ⚙️ Configuration Parameters
 
 During the integrations setup flow (or via **Configure**), you can customize the following settings:
 
 | Parameter | Key / Config Name | Default | Description |
 | :--- | :--- | :--- | :--- |
-| **Algorithm** | `algorithm_type` | `Standard (WHSS)` | The arbitrage optimization algorithm to run. Choose between the **Standard (WHSS)** peak/valley tracker, or the advanced, opt-in **Advanced (HSWAS) [β]** sliding-window solver. |
+| **Algorithm** | `algorithm_type` | `Standard (WHSS)` | The arbitrage optimization algorithm to run. Choose between the **Standard (WHSS)** wave heuristic, the opt-in **Advanced (HSWAS) [β]** sliding-window solver, or the optimal **Midpoint Extrema (MPES) [β]** duck-curve optimizer. |
 | **Forecast Entity** | `forecast_entity` | `sensor.zonneplan_current_quarter_hourly_electricity_tariff` | The Home Assistant entity that provides the electricity price forecast attribute. Supports both standard hourly and quarter-hourly formats. |
 | **Minimum Profit** | `min_profit_c_kwh` | `6` | The minimum price difference (in cents per kWh) required between charge and discharge intervals to trigger an action. |
 | **Charge Quarters** | `charge_quarters` | `8` | Maximum charging duration (in 15-minute quarters) allowed per price wave/interval (e.g., `8` quarters = 2 hours). |

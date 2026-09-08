@@ -16,10 +16,17 @@ CONF_RTE_PERCENT = "price_delta_percent"
 CONF_MIN_PROFIT = "min_profit_c_kwh"
 CONF_FORECAST_ENTITY = "forecast_entity"
 CONF_ALGORITHM = "algorithm_type"
+CONF_MULTIPLIER_ALGORITHM = "multiplier_type"
 
 # Algorithm types
 ALGORITHM_WHSS = "whss"
 ALGORITHM_HSWAS = "hswas"
+ALGORITHM_MPES = "mpes"
+
+# Multiplier calculation types
+MULTIPLIER_CPWL = "cpwl"
+MULTIPLIER_BLOCK = "block"
+DEFAULT_MULTIPLIER_ALGORITHM = MULTIPLIER_BLOCK
 
 # Standaardwaarden (optioneel)
 DEFAULT_PERCENTAGE = 20

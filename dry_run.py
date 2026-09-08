@@ -4,10 +4,16 @@ import sys
 import yaml
 from datetime import datetime, timedelta
 
-# Action constants
-ACTION_CHARGE = "Charge"
-ACTION_DISCHARGE = "Discharge"
-ACTION_STOP = "Stop"
+from custom_components.zonneplan_peakdetect.const import (
+    ALGORITHM_WHSS,
+    ALGORITHM_HSWAS,
+    ALGORITHM_MPES,
+    MULTIPLIER_CPWL,
+    MULTIPLIER_BLOCK,
+    ACTION_CHARGE,
+    ACTION_DISCHARGE,
+    ACTION_STOP,
+)
 
 # Minimal raw datetime parsing
 def _parse_datetime(val):
@@ -25,11 +31,13 @@ def calculate_action_schedule(
     charge_quarters=13,
     discharge_quarters=11,
     min_profit_eur_kwh=0.06,
-    price_delta_percent=20.0
+    price_delta_percent=20.0,
+    algorithm_type="whss",
+    multiplier_type="block"
 ):
-    """Refactored core scheduling algorithm exactly as defined in sensor.py."""
+    """Polymorphically runs the chosen BESS Arbitrage strategy and post-processes multipliers."""
     if not forecast_data:
-        return []
+        return [], 0
     
     rte_factor = 1.0 - (price_delta_percent / 100.0)
     
@@ -57,7 +65,6 @@ def calculate_action_schedule(
             continue
             
         dt = _parse_datetime(raw_dt)
-        is_passed = dt < now if dt else False
 
         prepared_data.append({
             'datetime': raw_dt,
@@ -68,125 +75,24 @@ def calculate_action_schedule(
             'sort_index': idx
         })
 
-    # 2. Determine interval duration and slot counts
-    interval_minutes = 15  # For 15-min quarters
+    # 2. Execute selected polymorphic strategy
     charge_slots_count = charge_quarters
     discharge_slots_count = discharge_quarters
 
-    # 3. Segment into Waves (Intervals)
-    prices = [item['price_eur_kwh'] for item in prepared_data]
-    n = len(prepared_data)
-    current_idx = 0
-    interval_count = 0
+    from custom_components.zonneplan_peakdetect.strategies import get_arbitrage_strategy
+    strategy = get_arbitrage_strategy(algorithm_type)
+    prepared_data = strategy.calculate_schedule(
+        prepared_data,
+        charge_slots_count,
+        discharge_slots_count,
+        rte_factor,
+        min_profit_eur_kwh,
+        now
+    )
 
-    while current_idx < n - 1:
-        # Step A: Find local valley
-        valley_idx = current_idx
-        valley_min = prices[current_idx]
-        
-        for j in range(current_idx, n):
-            valley_idx = j
-            if prices[j] < valley_min:
-                valley_min = prices[j]
-            if prices[j] >= (valley_min + min_profit_eur_kwh):
-                break
-        
-        # Step B: Find local peak
-        peak_idx = valley_idx
-        peak_max = prices[valley_idx]
-        
-        for j in range(valley_idx, n):
-            peak_idx = j
-            if prices[j] > peak_max:
-                peak_max = prices[j]
-            if prices[j] <= (peak_max - min_profit_eur_kwh):
-                break
-        
-        # Step C: Find the next valley index where the next wave starts
-        temp_min_idx = peak_idx
-        temp_min = prices[peak_idx]
-        wave_height = peak_max - valley_min
-        for j in range(peak_idx, n):
-            if prices[j] < temp_min:
-                temp_min = prices[j]
-                temp_min_idx = j
-            # Break if price recovers by 1/3 of min_profit, but only after dropping by at least 40% of wave height
-            # to avoid breaking prematurely during high evening peak variations
-            if temp_min <= (peak_max - 0.40 * wave_height) and prices[j] >= temp_min + (min_profit_eur_kwh * 0.33):
-                # Lookahead to verify if the recovery is sustained (at least 2 periods) to filter out transient spikes
-                if j + 1 < n and prices[j+1] < temp_min + (min_profit_eur_kwh * 0.33):
-                    continue
-                break
-        
-        # Find the local minimum during the transition night
-        night_min_idx = peak_idx
-        night_min_val = prices[peak_idx]
-        for k in range(peak_idx, temp_min_idx):
-            if prices[k] < night_min_val:
-                night_min_val = prices[k]
-                night_min_idx = k
-        
-        # Find the local maximum (shoulder) before the next descent
-        boundary_idx = night_min_idx
-        boundary_val = prices[night_min_idx]
-        for k in range(night_min_idx, temp_min_idx + 1):
-            if prices[k] > boundary_val:
-                boundary_val = prices[k]
-                boundary_idx = k
-        
-        segment_end = boundary_idx
-        # Guard: If segment_end points to the last element of the dataset, extend it to n (exclusive)
-        # so that the last element is included in the current segment and not orphaned.
-        if segment_end >= n - 1:
-            segment_end = n
-        # Guard: Prevent infinite loops by ensuring current_idx always advances by at least 1.
-        if segment_end == current_idx:
-            segment_end = current_idx + 1
-
-        # Define current wave segment
-        segment = prepared_data[current_idx : segment_end]
-        if not segment:
-            current_idx = segment_end
-            continue
-
-        # Process if profit threshold is met, taking round-trip efficiency into account
-        is_profitable = False
-        if (peak_max * rte_factor - valley_min) >= min_profit_eur_kwh:                
-            # CHARGE: Select cheapest hours before valley
-            charge_cands = [h for h in segment if h['sort_index'] < valley_idx and peak_max * rte_factor - h['price_eur_kwh'] >= min_profit_eur_kwh ]
-            charge_cands.sort(key=lambda x: x['price_eur_kwh'])
-            if charge_cands:
-                charge_slots = charge_cands[:charge_slots_count]
-                                
-                # DISCHARGE: Select most expensive hours after valley
-                discharge_cands = [h for h in segment if h['sort_index'] >= valley_idx and h['price_eur_kwh'] * rte_factor - valley_min >= min_profit_eur_kwh]
-                discharge_cands.sort(key=lambda x: x['price_eur_kwh'], reverse=True)
-                if discharge_cands:
-                    discharge_slots = discharge_cands[:discharge_slots_count]
-
-                    # Balance charge and discharge slots
-                    num_slots = min(len(charge_slots), len(discharge_slots))
-                    charge_slots = charge_slots[:num_slots]
-                    discharge_slots = discharge_slots[:num_slots]
-
-                    if len(charge_slots) > 0 and len(discharge_slots) > 0:
-                        for s in segment:
-                            s['interval_id'] = interval_count
-
-                        for s in charge_slots:
-                            s['action'] = ACTION_CHARGE
-                                        
-                        for s in discharge_slots:
-                            s['action'] = ACTION_DISCHARGE
-                        
-                        interval_count += 1
-        
-        current_idx = segment_end
-
-    # Recalculate price_multiplier using continuous linear interpolation of divisors between wave valleys
+    # 3. Post-Process Multipliers using the same logic as sensor.py
     n = len(prepared_data)
     if n > 0:
-        # 1. Find the valley index and price for each active wave (interval_id >= 0)
         valleys = {}
         for idx, item in enumerate(prepared_data):
             iid = item.get('interval_id', -1)
@@ -195,19 +101,18 @@ def calculate_action_schedule(
                     price = item['price_eur_kwh']
                     if iid not in valleys or price < valleys[iid]['price']:
                         valleys[iid] = {'idx': idx, 'price': price}
-        
-        # Sort waves to ensure correct chronological sequence
+
         active_wave_ids = sorted(valleys.keys())
-        
+
         if not active_wave_ids:
-            # Fallback to absolute minimum of the entire forecast if no active waves are found
+            # Fallback to absolute minimum
             global_min = min(item['price_eur_kwh'] for item in prepared_data)
             for item in prepared_data:
                 p = item['price_eur_kwh']
                 item['price_multiplier'] = round(p / global_min, 2) if global_min > 0 else round(1.0 + p / abs(global_min), 2) if global_min != 0 else 1.0
                 item['interval_id'] = -1
         else:
-            # 2. Assign interval_id to all items based on closest wave's midpoint partition
+            # Reassign close midpoints
             if len(active_wave_ids) == 1:
                 single_id = active_wave_ids[0]
                 for item in prepared_data:
@@ -218,41 +123,64 @@ def calculate_action_schedule(
                     idx_a = valleys[active_wave_ids[k]]['idx']
                     idx_b = valleys[active_wave_ids[k+1]]['idx']
                     midpoints.append((idx_a + idx_b) // 2)
-                
+
                 for idx, item in enumerate(prepared_data):
-                    assigned_id = active_wave_ids[-1]
-                    for k in range(len(midpoints)):
-                        if idx <= midpoints[k]:
-                            assigned_id = active_wave_ids[k]
-                            break
+                    assigned_id = active_wave_ids[0]
+                    for k, mid in enumerate(midpoints):
+                        if idx > mid:
+                            assigned_id = active_wave_ids[k+1]
                     item['interval_id'] = assigned_id
 
-            # 3. Calculate divisor for each interval in the timeline
-            anchors = [(valleys[iid]['idx'], valleys[iid]['price']) for iid in active_wave_ids]
-            
-            for idx, item in enumerate(prepared_data):
-                p = item['price_eur_kwh']
+            # Calculate divisor for each interval in the timeline
+            if multiplier_type == MULTIPLIER_BLOCK:
+                # Partition into windows anchored at the end of each active wave segment
+                windows = []
+                prev_end = 0
+                for iid in active_wave_ids:
+                    active_indices = [idx for idx, item in enumerate(prepared_data) if item.get('interval_id', -1) == iid and item.get('action') != ACTION_STOP]
+                    end_idx = (max(active_indices) + 1) if active_indices else n
+                    windows.append((prev_end, end_idx))
+                    prev_end = end_idx
                 
-                # If before the first valley, lock to first valley price
-                if idx <= anchors[0][0]:
-                    divisor = anchors[0][1]
-                # If after the last valley, lock to last valley price
-                elif idx >= anchors[-1][0]:
-                    divisor = anchors[-1][1]
-                # If in between two valleys, linearly interpolate
-                else:
-                    # Find the two bounding valleys
-                    for k in range(len(anchors) - 1):
-                        idx_a, price_a = anchors[k]
-                        idx_b, price_b = anchors[k+1]
-                        if idx_a <= idx <= idx_b:
-                            # Interpolation fraction
-                            f = (idx - idx_a) / (idx_b - idx_a)
-                            divisor = (1.0 - f) * price_a + f * price_b
-                            break
+                if windows:
+                    # Extend the last window to cover the trailing part of the day
+                    last_start, _ = windows[-1]
+                    windows[-1] = (last_start, n)
+
+                # For each window, find its minimum price and calculate multipliers
+                for start, end in windows:
+                    window_slice = prepared_data[start:end]
+                    if window_slice:
+                        window_min = min(item['price_eur_kwh'] for item in window_slice)
+                        for item in window_slice:
+                            p = item['price_eur_kwh']
+                            item['price_multiplier'] = round(p / window_min, 2) if window_min > 0 else round(1.0 + p / abs(window_min), 2) if window_min != 0 else 1.0
+            else: # MULTIPLIER_CPWL
+                anchors = [(valleys[iid]['idx'], valleys[iid]['price']) for iid in active_wave_ids]
                 
-                # Compute multiplier
-                item['price_multiplier'] = round(p / divisor, 2) if divisor > 0 else round(1.0 + p / abs(divisor), 2) if divisor != 0 else 1.0
+                for idx, item in enumerate(prepared_data):
+                    p = item['price_eur_kwh']
+                    
+                    # If before the first valley, lock to first valley price
+                    if idx <= anchors[0][0]:
+                        divisor = anchors[0][1]
+                    # If after the last valley, lock to last valley price
+                    elif idx >= anchors[-1][0]:
+                        divisor = anchors[-1][1]
+                    # If in between two valleys, linearly interpolate
+                    else:
+                        # Find the two bounding valleys
+                        for k in range(len(anchors) - 1):
+                            idx_a, price_a = anchors[k]
+                            idx_b, price_b = anchors[k+1]
+                            if idx_a <= idx <= idx_b:
+                                # Interpolation fraction
+                                f = (idx - idx_a) / (idx_b - idx_a)
+                                divisor = (1.0 - f) * price_a + f * price_b
+                                break
+                    
+                    # Compute multiplier
+                    item['price_multiplier'] = round(p / divisor, 2) if divisor > 0 else round(1.0 + p / abs(divisor), 2) if divisor != 0 else 1.0
 
         # Assign price_multiplier_quartile (1, 2, 3, 4) to each interval
         multipliers = [item.get('price_multiplier', 1.0) for item in prepared_data]
@@ -276,6 +204,8 @@ def calculate_action_schedule(
     # Cleanup internal keys
     for item in prepared_data:
         item.pop('sort_index', None)
+    
+    interval_count = len(set(item['interval_id'] for item in prepared_data if item.get('interval_id', -1) >= 0 and item.get('action') != ACTION_STOP))
     return prepared_data, interval_count
 
 # Your original forecast dataset
@@ -496,9 +426,19 @@ def main():
     discharge_quarters = 11
     min_profit = 0.06
     price_delta_percent = 20.0
+    algorithm_type = ALGORITHM_WHSS
+    multiplier_type = MULTIPLIER_BLOCK
 
-    if len(sys.argv) > 1:
-        filepath = sys.argv[1]
+    filepath = None
+    for arg in sys.argv[1:]:
+        if arg in (ALGORITHM_WHSS, ALGORITHM_HSWAS, ALGORITHM_MPES):
+            algorithm_type = arg
+        elif arg in (MULTIPLIER_CPWL, MULTIPLIER_BLOCK):
+            multiplier_type = arg
+        else:
+            filepath = arg
+
+    if filepath is not None:
         try:
             with open(filepath, 'r') as f:
                 content = f.read()
@@ -531,6 +471,8 @@ def main():
                         min_profit = attrs['min_profit_required_eur_kwh']
                     if 'price_delta_threshold_percent' in attrs:
                         price_delta_percent = attrs['price_delta_threshold_percent']
+                    if 'multiplier_type' in attrs:
+                        multiplier_type = attrs['multiplier_type']
                 elif 'schedule' in parsed:
                     parsed = parsed['schedule']
                 elif 'forecast' in parsed:
@@ -554,7 +496,9 @@ def main():
         charge_quarters=charge_quarters, 
         discharge_quarters=discharge_quarters, 
         min_profit_eur_kwh=min_profit,
-        price_delta_percent=price_delta_percent
+        price_delta_percent=price_delta_percent,
+        algorithm_type=algorithm_type,
+        multiplier_type=multiplier_type
     )
     
     active_intervals = len(set(item['interval_id'] for item in schedule if item.get('interval_id', -1) >= 0 and item.get('action') != ACTION_STOP))
@@ -586,16 +530,26 @@ def main():
         
         iid_quartiles[iid] = f"[{min_val:.2f}, {q25:.2f}, {q50:.2f}, {q75:.2f}, {max_val:.2f}]"
 
-    print("\n" + "=" * 120)
+    print("\n" + "=" * 80)
     print(" BESS ARBITRAGE SCHEDULER - ALGORITHM TEST RESULTS")
-    print("=" * 120)
+    print("=" * 80)
     print(f"Total Intervals Segmented: {active_intervals}")
-    print(f"Configuration: charge_quarters={charge_quarters}, discharge_quarters={discharge_quarters}, min_profit={min_profit}, price_delta_percent={price_delta_percent}")
-    print("-" * 120)
-    print(f"{'Datetime':<30} | {'Price (€/kWh)':<14} | {'Multiplier':<11} | {'Quartiles (Min-Max)':<30} | {'Action':<10} | {'Interval ID':<11}")
-    print("-" * 120)
+    print(f"Configuration: strategy={algorithm_type}, multiplier={multiplier_type}, charge_quarters={charge_quarters}, discharge_quarters={discharge_quarters}, min_profit={min_profit}, price_delta_percent={price_delta_percent}")
+    print("-" * 80)
+    print(f"{'Datetime':<30} | {'Price (€/kWh)':<14} | {'Multiplier':<11} | {'Action':<10} | {'Interval ID':<11}")
+    print("-" * 80)
 
+    last_interval_id = None
     for item in schedule:
+        iid = item.get('interval_id', -1)
+        if iid != last_interval_id:
+            if iid == -1:
+                print(f"\n=== INTERVAL ID: -1 (Unassigned / Gaps) ========================================")
+            else:
+                q_str = iid_quartiles.get(iid, "[1.00, 1.00, 1.00, 1.00, 1.00]")
+                print(f"\n=== INTERVAL ID: {iid} (Quartiles: {q_str}) ========================================")
+            last_interval_id = iid
+
         action = item["action"]
         if action == ACTION_CHARGE:
             action_str = f"\033[92m{action:<10}\033[0m"  # Green
@@ -604,13 +558,10 @@ def main():
         else:
             action_str = f"{action:<10}"
 
-        iid = item.get('interval_id', -1)
-        q_str = iid_quartiles.get(iid, "[1.00, 1.00, 1.00, 1.00, 1.00]")
-
         print(
-            f"{item['datetime']:<30} | {item['price_eur_kwh']:<14.7f} | {item['price_multiplier']:<11.2f} | {q_str:<30} | {action_str} | {item['interval_id']:<11}"
+            f"{item['datetime']:<30} | {item['price_eur_kwh']:<14.7f} | {item['price_multiplier']:<11.2f} | {action_str} | {item['interval_id']:<11}"
         )
-    print("=" * 120 + "\n")
+    print("=" * 80 + "\n")
 
 if __name__ == "__main__":
     main()
