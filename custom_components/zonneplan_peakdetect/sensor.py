@@ -150,6 +150,8 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
             "solar_bonus_percent": self._solar_bonus_percent,
             "solar_bonus_fixed_c_kwh": solar_bonus_fixed_c_kwh,
             "current_price_multiplier": 1.0,
+            "current_price_bonus": 0.0,
+            "current_solar_bonus_price": 0.0,
             "price_multiplier_quantiles": None,
         }
         self._attr_device_info = DeviceInfo(
@@ -419,9 +421,20 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         intervals = len(set(h['interval_id'] for h in schedule if h.get('interval_id', -1) >= 0 and h.get('action') != ACTION_STOP))
         self._attr_extra_state_attributes['intervals'] = intervals
 
-        # Remove helper key before returning
-        for item in schedule: item.pop('sort_index', None)
-        return schedule
+        # Format output keys for Home Assistant attributes
+        formatted_schedule = []
+        for item in schedule:
+            bonus_amount = round(item['sell_price_eur_kwh'] - item['price_eur_kwh'], 7) if item.get('solar_bonus_applied') else 0.0
+            formatted_schedule.append({
+                'datetime': item['datetime'],
+                'price_eur_kwh': item['price_eur_kwh'],
+                'price_bonus_eur_kwh': bonus_amount,
+                'price_multiplier': item['price_multiplier'],
+                'action': item['action'],
+                'interval_id': item['interval_id'],
+            })
+            
+        return formatted_schedule
 
     async def async_update(self) -> None:
         """Get the latest forecast data and update the state."""
