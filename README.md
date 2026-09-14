@@ -119,6 +119,15 @@ The integration registers a single sensor, `sensor.battery_optimizer_action` (En
   ]
   ```
 
+  Each item in the `schedule` list contains:
+  - **`datetime`**: The date and time of the forecast slot.
+  - **`price_eur_kwh`**: The raw market price of electricity (€/kWh).
+  - **`buy_price_eur_kwh`**: The price used for charging (€/kWh) - this is always the raw market price.
+  - **`sell_price_eur_kwh`**: The price used for discharging (€/kWh) - this is the raw market price, optionally including the solar bonus (Zonnebonus) during active daylight hours if enabled.
+  - **`price_multiplier`**: Calculated price multiplier value relative to the interval's minimum.
+  - **`action`**: The recommended battery action (`Charge`, `Discharge`, or `Stop`).
+  - **`interval_id`**: The ID of the assigned chronological interval/cycle (`-1` for unassigned / gaps).
+
 ---
 
 ## 🛠️ Requirements

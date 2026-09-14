@@ -26,6 +26,64 @@ def _parse_datetime(val):
         return datetime.fromisoformat(val)
     return None
 
+try:
+    from astral import LocationInfo
+    from astral.sun import sun
+    HAS_ASTRAL = True
+except ImportError:
+    HAS_ASTRAL = False
+
+def _get_solar_bonus_windows(forecast_datetimes):
+    """Return daylight windows covered by the forecast."""
+    if not forecast_datetimes:
+        return []
+
+    first_date = min(item.date() for item in forecast_datetimes)
+    last_date = max(item.date() for item in forecast_datetimes)
+    windows = []
+    
+    if HAS_ASTRAL:
+        city = LocationInfo("Amsterdam", "Netherlands", "Europe/Amsterdam", 52.3676, 4.9041)
+        current_date = first_date - timedelta(days=1)
+        while current_date <= last_date + timedelta(days=1):
+            try:
+                s = sun(city.observer, date=current_date)
+                sunrise = s['sunrise']
+                sunset = s['sunset']
+                if sunrise < sunset:
+                    windows.append((sunrise, sunset))
+            except Exception:
+                pass
+            current_date += timedelta(days=1)
+    else:
+        # Fallback: standard daily sunrise/sunset in UTC (Amsterdam DST is roughly 4am to 8pm UTC)
+        current_date = first_date - timedelta(days=1)
+        while current_date <= last_date + timedelta(days=1):
+            from datetime import timezone
+            sunrise = datetime(current_date.year, current_date.month, current_date.day, 4, 0, tzinfo=timezone.utc)
+            sunset = datetime(current_date.year, current_date.month, current_date.day, 20, 0, tzinfo=timezone.utc)
+            windows.append((sunrise, sunset))
+            current_date += timedelta(days=1)
+            
+    return windows
+
+def _solar_bonus_applies(slot_time, solar_windows):
+    """Check whether a forecast slot is between sunrise and sunset."""
+    from datetime import timezone
+    def to_naive_utc(dt):
+        if dt.tzinfo is not None:
+            dt = dt.astimezone(timezone.utc).replace(tzinfo=None)
+        return dt
+
+    slot_naive = to_naive_utc(slot_time)
+    
+    for sunrise, sunset in solar_windows:
+        sunrise_naive = to_naive_utc(sunrise)
+        sunset_naive = to_naive_utc(sunset)
+        if sunrise_naive <= slot_naive < sunset_naive:
+            return True
+    return False
+
 def calculate_action_schedule(
     forecast_data,
     charge_quarters=13,
@@ -33,19 +91,33 @@ def calculate_action_schedule(
     min_profit_eur_kwh=0.06,
     price_delta_percent=20.0,
     algorithm_type="whss",
-    multiplier_type="block"
+    multiplier_type="block",
+    solar_bonus_percent=10.0,
+    solar_bonus_fixed_c_kwh=2.0
 ):
     """Polymorphically runs the chosen BESS Arbitrage strategy and post-processes multipliers."""
     if not forecast_data:
         return [], 0
     
     rte_factor = 1.0 - (price_delta_percent / 100.0)
+    solar_bonus_fixed_eur_kwh = solar_bonus_fixed_c_kwh / 100.0
     
     first_dt = None
     if forecast_data:
         first_raw = forecast_data[0].get('datetime') or forecast_data[0].get('start_date')
         if first_raw:
             first_dt = _parse_datetime(first_raw)
+            
+    # Prepare datetimes list for daylight window calculations
+    forecast_datetimes = []
+    for item in forecast_data:
+        raw_dt = item.get('start_date') or item.get('datetime')
+        if raw_dt:
+            dt = _parse_datetime(raw_dt)
+            if dt:
+                forecast_datetimes.append(dt)
+                
+    solar_bonus_windows = _get_solar_bonus_windows(forecast_datetimes)
             
     # 1. Prepare Data
     now = first_dt if first_dt else datetime.fromisoformat("2026-07-28T18:00:00")  # Mock current time to start of dataset
@@ -66,9 +138,30 @@ def calculate_action_schedule(
             
         dt = _parse_datetime(raw_dt)
 
+        solar_bonus_applied = bool(
+            dt
+            and (
+                solar_bonus_percent > 0
+                or solar_bonus_fixed_eur_kwh > 0
+            )
+            and _solar_bonus_applies(dt, solar_bonus_windows)
+        )
+        effective_price = price
+        if solar_bonus_applied:
+            effective_price = (
+                price + solar_bonus_fixed_eur_kwh
+            ) * (1.0 + solar_bonus_percent / 100.0)
+
         prepared_data.append({
             'datetime': raw_dt,
             'price_eur_kwh': price,
+            'buy_price_eur_kwh': price,
+            'sell_price_eur_kwh': effective_price,
+            'forecast_price_eur_kwh': price,
+            'solar_bonus_applied': solar_bonus_applied,
+            'solar_bonus_multiplier': round(
+                effective_price / price, 4
+            ) if price != 0 else 1.0,
             'price_multiplier': 1.0,
             'action': ACTION_STOP,
             'interval_id': -1,
@@ -98,7 +191,7 @@ def calculate_action_schedule(
             iid = item.get('interval_id', -1)
             if item.get('action') != ACTION_STOP:
                 if iid >= 0:
-                    price = item['price_eur_kwh']
+                    price = item.get('buy_price_eur_kwh', item['price_eur_kwh'])
                     if iid not in valleys or price < valleys[iid]['price']:
                         valleys[iid] = {'idx': idx, 'price': price}
 
@@ -106,9 +199,9 @@ def calculate_action_schedule(
 
         if not active_wave_ids:
             # Fallback to absolute minimum
-            global_min = min(item['price_eur_kwh'] for item in prepared_data)
+            global_min = min(item.get('buy_price_eur_kwh', item['price_eur_kwh']) for item in prepared_data)
             for item in prepared_data:
-                p = item['price_eur_kwh']
+                p = item.get('sell_price_eur_kwh', item['price_eur_kwh'])
                 item['price_multiplier'] = round(p / global_min, 2) if global_min > 0 else round(1.0 + p / abs(global_min), 2) if global_min != 0 else 1.0
                 item['interval_id'] = -1
         else:
@@ -151,15 +244,15 @@ def calculate_action_schedule(
                 for start, end in windows:
                     window_slice = prepared_data[start:end]
                     if window_slice:
-                        window_min = min(item['price_eur_kwh'] for item in window_slice)
+                        window_min = min(item.get('buy_price_eur_kwh', item['price_eur_kwh']) for item in window_slice)
                         for item in window_slice:
-                            p = item['price_eur_kwh']
+                            p = item.get('sell_price_eur_kwh', item['price_eur_kwh'])
                             item['price_multiplier'] = round(p / window_min, 2) if window_min > 0 else round(1.0 + p / abs(window_min), 2) if window_min != 0 else 1.0
             else: # MULTIPLIER_CPWL
                 anchors = [(valleys[iid]['idx'], valleys[iid]['price']) for iid in active_wave_ids]
                 
                 for idx, item in enumerate(prepared_data):
-                    p = item['price_eur_kwh']
+                    p = item.get('sell_price_eur_kwh', item['price_eur_kwh'])
                     
                     # If before the first valley, lock to first valley price
                     if idx <= anchors[0][0]:
@@ -182,7 +275,7 @@ def calculate_action_schedule(
                     # Compute multiplier
                     item['price_multiplier'] = round(p / divisor, 2) if divisor > 0 else round(1.0 + p / abs(divisor), 2) if divisor != 0 else 1.0
 
-        # Assign price_multiplier_quartile (1, 2, 3, 4) to each interval
+        # Assign price_multiplier_quantile (1, 2, 3, 4) to each interval
         multipliers = [item.get('price_multiplier', 1.0) for item in prepared_data]
         if len(multipliers) >= 2:
             import statistics
@@ -191,13 +284,13 @@ def calculate_action_schedule(
                 for item in prepared_data:
                     m = item.get('price_multiplier', 1.0)
                     if m <= q[0]:
-                        item['price_multiplier_quartile'] = 1
+                        item['price_multiplier_quantile'] = 1
                     elif m <= q[1]:
-                        item['price_multiplier_quartile'] = 2
+                        item['price_multiplier_quantile'] = 2
                     elif m <= q[2]:
-                        item['price_multiplier_quartile'] = 3
+                        item['price_multiplier_quantile'] = 3
                     else:
-                        item['price_multiplier_quartile'] = 4
+                        item['price_multiplier_quantile'] = 4
             except Exception:
                 pass
 
@@ -426,6 +519,8 @@ def main():
     discharge_quarters = 11
     min_profit = 0.06
     price_delta_percent = 20.0
+    solar_bonus_percent = 10.0
+    solar_bonus_fixed_c_kwh = 2.0
     algorithm_type = ALGORITHM_WHSS
     multiplier_type = MULTIPLIER_BLOCK
 
@@ -473,6 +568,10 @@ def main():
                         price_delta_percent = attrs['price_delta_threshold_percent']
                     if 'multiplier_type' in attrs:
                         multiplier_type = attrs['multiplier_type']
+                    if 'solar_bonus_percent' in attrs:
+                        solar_bonus_percent = attrs['solar_bonus_percent']
+                    if 'solar_bonus_fixed_c_kwh' in attrs:
+                        solar_bonus_fixed_c_kwh = attrs['solar_bonus_fixed_c_kwh']
                 elif 'schedule' in parsed:
                     parsed = parsed['schedule']
                 elif 'forecast' in parsed:
@@ -498,19 +597,21 @@ def main():
         min_profit_eur_kwh=min_profit,
         price_delta_percent=price_delta_percent,
         algorithm_type=algorithm_type,
-        multiplier_type=multiplier_type
+        multiplier_type=multiplier_type,
+        solar_bonus_percent=solar_bonus_percent,
+        solar_bonus_fixed_c_kwh=solar_bonus_fixed_c_kwh
     )
     
     active_intervals = len(set(item['interval_id'] for item in schedule if item.get('interval_id', -1) >= 0 and item.get('action') != ACTION_STOP))
 
-    # Calculate quartiles fixed per interval_id
+    # Calculate quantiles fixed per interval_id
     from collections import defaultdict
     iid_multipliers = defaultdict(list)
     for item in schedule:
         iid = item.get('interval_id', -1)
         iid_multipliers[iid].append(item.get('price_multiplier', 1.0))
         
-    iid_quartiles = {}
+    iid_quantiles = {}
     for iid, mults in iid_multipliers.items():
         min_val, max_val = 1.0, 1.0
         q25, q50, q75 = 1.0, 1.0, 1.0
@@ -528,40 +629,42 @@ def main():
         elif len(mults) == 1:
             min_val = max_val = q25 = q50 = q75 = mults[0]
         
-        iid_quartiles[iid] = f"[{min_val:.2f}, {q25:.2f}, {q50:.2f}, {q75:.2f}, {max_val:.2f}]"
+        iid_quantiles[iid] = f"[{min_val:.2f}, {q25:.2f}, {q50:.2f}, {q75:.2f}, {max_val:.2f}]"
 
-    print("\n" + "=" * 80)
+    print("\n" + "=" * 110)
     print(" BESS ARBITRAGE SCHEDULER - ALGORITHM TEST RESULTS")
-    print("=" * 80)
+    print("=" * 110)
     print(f"Total Intervals Segmented: {active_intervals}")
-    print(f"Configuration: strategy={algorithm_type}, multiplier={multiplier_type}, charge_quarters={charge_quarters}, discharge_quarters={discharge_quarters}, min_profit={min_profit}, price_delta_percent={price_delta_percent}")
-    print("-" * 80)
-    print(f"{'Datetime':<30} | {'Price (€/kWh)':<14} | {'Multiplier':<11} | {'Action':<10} | {'Interval ID':<11}")
-    print("-" * 80)
+    print(f"Configuration: strategy={algorithm_type}, multiplier={multiplier_type}, charge_quarters={charge_quarters}, discharge_quarters={discharge_quarters}, min_profit={min_profit}, price_delta_percent={price_delta_percent}, solar_bonus_percent={solar_bonus_percent}, solar_bonus_fixed_c_kwh={solar_bonus_fixed_c_kwh}")
+    print("-" * 110)
+    print(f"{'Datetime':<30} | {'Price (€/kWh)':<14} | {'Zonnebonus (€/kWh)':<19} | {'Multiplier':<11} | {'Action':<10} | {'Interval ID':<11}")
+    print("-" * 110)
 
     last_interval_id = None
     for item in schedule:
         iid = item.get('interval_id', -1)
         if iid != last_interval_id:
             if iid == -1:
-                print(f"\n=== INTERVAL ID: -1 (Unassigned / Gaps) ========================================")
+                print(f"\n=== INTERVAL ID: -1 (Unassigned / Gaps) ========================================================================")
             else:
-                q_str = iid_quartiles.get(iid, "[1.00, 1.00, 1.00, 1.00, 1.00]")
-                print(f"\n=== INTERVAL ID: {iid} (Quartiles: {q_str}) ========================================")
+                q_str = iid_quantiles.get(iid, "[1.00, 1.00, 1.00, 1.00, 1.00]")
+                print(f"\n=== INTERVAL ID: {iid} (Quantiles: {q_str}) ========================================================================")
             last_interval_id = iid
 
         action = item["action"]
         if action == ACTION_CHARGE:
             action_str = f"\033[92m{action:<10}\033[0m"  # Green
-        elif action == ACTION_DISCHARGE:
+        elif action =="ACTION_DISCHARGE" or action == ACTION_DISCHARGE:
             action_str = f"\033[91m{action:<10}\033[0m"  # Red
         else:
             action_str = f"{action:<10}"
 
+        bonus_val = f"{item['sell_price_eur_kwh']:.7f}" if item.get('solar_bonus_applied') else "-"
+
         print(
-            f"{item['datetime']:<30} | {item['price_eur_kwh']:<14.7f} | {item['price_multiplier']:<11.2f} | {action_str} | {item['interval_id']:<11}"
+            f"{item['datetime']:<30} | {item['price_eur_kwh']:<14.7f} | {bonus_val:<19} | {item['price_multiplier']:<11.2f} | {action_str} | {item['interval_id']:<11}"
         )
-    print("=" * 80 + "\n")
+    print("=" * 110 + "\n")
 
 if __name__ == "__main__":
     main()

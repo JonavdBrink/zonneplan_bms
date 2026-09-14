@@ -11,6 +11,7 @@ from custom_components.zonneplan_peakdetect.const import (
     CONF_FORECAST_ENTITY,
     CONF_ALGORITHM,
     CONF_SOLAR_BONUS_PERCENT,
+    CONF_SOLAR_BONUS_FIXED_C_KWH,
     ALGORITHM_HSWAS,
 )
 from custom_components.zonneplan_peakdetect.strategies.sliding_window import HswasStrategy
@@ -35,6 +36,7 @@ async def test_sensor_algorithm_hswas_august_extremes(hass, freezer, august_extr
             CONF_RTE_PERCENT: 20.0,
             CONF_MIN_PROFIT: 6.0,      # 6 cents
             CONF_SOLAR_BONUS_PERCENT: 10.0, # Solar bonus enabled 10% default
+            CONF_SOLAR_BONUS_FIXED_C_KWH: 2.0,
         },
         entry_id="test_optimizer_entry",
     )
@@ -101,7 +103,8 @@ async def test_sensor_algorithm_hswas_july_baseline(hass, freezer, july_baseline
             "discharge_hours": 2.75,   # 11 quarters
             CONF_RTE_PERCENT: 20.0,
             CONF_MIN_PROFIT: 6.0,      # 6 cents
-            CONF_SOLAR_BONUS_PERCENT: 10.0, # Solar bonus enabled 10% default
+            CONF_SOLAR_BONUS_PERCENT: 10.0,
+            CONF_SOLAR_BONUS_FIXED_C_KWH: 2.0,
         },
         entry_id="test_optimizer_entry",
     )
@@ -128,8 +131,8 @@ async def test_sensor_algorithm_hswas_july_baseline(hass, freezer, july_baseline
     state = hass.states.get(entity_id)
     assert state is not None
     
-    # Assert correct number of segmented cycles and algorithm type (HSWAS correctly gets 1)
-    assert state.attributes.get("intervals") == 1
+    # Assert correct number of segmented cycles and algorithm type (HSWAS gets 3 with active solar bonus)
+    assert state.attributes.get("intervals") == 3
     assert state.attributes.get("algorithm_type") == ALGORITHM_HSWAS
     
     # Assert schedule is generated
@@ -137,8 +140,8 @@ async def test_sensor_algorithm_hswas_july_baseline(hass, freezer, july_baseline
     assert schedule is not None
     assert len(schedule) == len(july_baseline_forecast)
     
-    # Chronological safety checking for the scheduled interval (index 0)
-    for interval_id in range(1):
+    # Chronological safety checking for all scheduled intervals
+    for interval_id in range(3):
         interval_slots = [item for item in schedule if item.get("interval_id") == interval_id]
         charge_slots = [item for item in interval_slots if item["action"] == ACTION_CHARGE]
         discharge_slots = [item for item in interval_slots if item["action"] == ACTION_DISCHARGE]
@@ -163,6 +166,7 @@ async def test_sensor_algorithm_hswas_july29(hass, freezer, july29_forecast):
             CONF_RTE_PERCENT: 20.0,
             CONF_MIN_PROFIT: 6.0,      # 6 cents
             CONF_SOLAR_BONUS_PERCENT: 10.0, # Solar bonus enabled 10% default
+            CONF_SOLAR_BONUS_FIXED_C_KWH: 2.0,
         },
         entry_id="test_optimizer_entry",
     )
@@ -221,6 +225,7 @@ async def test_hswas_hourly_tariff(hass, freezer):
             CONF_RTE_PERCENT: 20.0,
             CONF_MIN_PROFIT: 6.0,      # 6 cents
             CONF_SOLAR_BONUS_PERCENT: 10.0, # Solar bonus enabled 10% default
+            CONF_SOLAR_BONUS_FIXED_C_KWH: 2.0,
         },
         entry_id="test_optimizer_entry",
     )
