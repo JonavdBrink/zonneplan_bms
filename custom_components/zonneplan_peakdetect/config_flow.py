@@ -29,6 +29,10 @@ from .const import (
     DEFAULT_PERCENTAGE,
     DEFAULT_ALGORITHM,
     DEFAULT_MULTIPLIER_ALGORITHM,
+    CONF_SOLAR_BONUS_PERCENT,
+    CONF_SOLAR_BONUS_FIXED_C_KWH,
+    DEFAULT_SOLAR_BONUS_PERCENT,
+    DEFAULT_SOLAR_BONUS_FIXED_C_KWH,
     DOMAIN,
 )
 
@@ -85,6 +89,17 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 CONF_FORECAST_ENTITY, 
                 default=user_input.get(CONF_FORECAST_ENTITY, DEFAULT_FORECAST_ENTITY)
             ): cv.string,
+            vol.Required(
+                CONF_SOLAR_BONUS_PERCENT,
+                default=user_input.get(CONF_SOLAR_BONUS_PERCENT, DEFAULT_SOLAR_BONUS_PERCENT)
+            ): vol.All(vol.Coerce(float), vol.Range(min=0.0, max=100.0)),
+            vol.Required(
+                CONF_SOLAR_BONUS_FIXED_C_KWH,
+                default=user_input.get(
+                    CONF_SOLAR_BONUS_FIXED_C_KWH,
+                    DEFAULT_SOLAR_BONUS_FIXED_C_KWH,
+                )
+            ): vol.All(vol.Coerce(float), vol.Range(min=0.0, max=100.0)),
         })
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:

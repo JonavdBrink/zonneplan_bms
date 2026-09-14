@@ -9,6 +9,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.device_registry import DeviceEntryType, DeviceInfo
 from homeassistant.helpers.event import async_track_state_change_event
 from homeassistant.helpers.restore_state import RestoreEntity
+from homeassistant.helpers.sun import get_astral_event_date
 from homeassistant.util import dt as dt_util
 
 from .const import (
@@ -22,8 +23,14 @@ from .const import (
     CONF_RTE_PERCENT,
     CONF_ALGORITHM,
     CONF_MULTIPLIER_ALGORITHM,
+    CONF_SOLAR_BONUS_PERCENT,
+    CONF_SOLAR_BONUS_FIXED_C_KWH,
     DEFAULT_ALGORITHM,
     DEFAULT_MULTIPLIER_ALGORITHM,
+    DEFAULT_CENTS,
+    DEFAULT_PERCENTAGE,
+    DEFAULT_SOLAR_BONUS_PERCENT,
+    DEFAULT_SOLAR_BONUS_FIXED_C_KWH,
     MULTIPLIER_CPWL,
     MULTIPLIER_BLOCK,
     DOMAIN,
@@ -65,6 +72,11 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: Any, async_add_en
 
     algorithm_type = config.get(CONF_ALGORITHM, DEFAULT_ALGORITHM)
     multiplier_type = config.get(CONF_MULTIPLIER_ALGORITHM, DEFAULT_MULTIPLIER_ALGORITHM)
+    solar_bonus_percent = config.get(CONF_SOLAR_BONUS_PERCENT, DEFAULT_SOLAR_BONUS_PERCENT)
+    solar_bonus_fixed_c_kwh = config.get(
+        CONF_SOLAR_BONUS_FIXED_C_KWH,
+        DEFAULT_SOLAR_BONUS_FIXED_C_KWH,
+    )
 
     async_add_entities([
         BatteryOptimizerSensor(
@@ -76,6 +88,8 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: Any, async_add_en
             min_profit_c_kwh,
             algorithm_type,
             multiplier_type,
+            solar_bonus_percent,
+            solar_bonus_fixed_c_kwh,
             SENSOR_DESCRIPTION
         )
     ], True)
@@ -105,6 +119,8 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         min_profit_c_kwh: float,
         algorithm_type: str,
         multiplier_type: str,
+        solar_bonus_percent: float,
+        solar_bonus_fixed_c_kwh: float,
         description: SensorEntityDescription
     ) -> None:
         """Initialize the sensor."""
@@ -117,6 +133,8 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         self._price_delta_percent = price_delta_percent
         self._algorithm_type = algorithm_type
         self._multiplier_type = multiplier_type
+        self._solar_bonus_percent = solar_bonus_percent
+        self._solar_bonus_fixed_eur_kwh = solar_bonus_fixed_c_kwh / 100.0
         # Convert minimal profit from cents/kWh to €/kWh
         self._min_profit_eur_kwh = min_profit_c_kwh / 100.0
         self._attr_native_value = ACTION_STOP
@@ -129,6 +147,8 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
             "price_delta_threshold_percent": self._price_delta_percent,
             "algorithm_type": self._algorithm_type,
             "multiplier_type": self._multiplier_type,
+            "solar_bonus_percent": self._solar_bonus_percent,
+            "solar_bonus_fixed_c_kwh": solar_bonus_fixed_c_kwh,
             "current_price_multiplier": 1.0,
             "price_multiplier_quartiles": None,
         }
@@ -163,6 +183,38 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         """
         return price_int / 10_000_000.0
 
+    def _get_solar_bonus_windows(
+        self, forecast_datetimes: list[datetime]
+    ) -> list[tuple[datetime, datetime]]:
+        """Return daylight windows covered by the forecast."""
+        if not forecast_datetimes:
+            return []
+
+        first_date = min(item.date() for item in forecast_datetimes)
+        last_date = max(item.date() for item in forecast_datetimes)
+        windows: list[tuple[datetime, datetime]] = []
+        current_date = first_date - timedelta(days=1)
+        while current_date <= last_date + timedelta(days=1):
+            try:
+                sunrise = get_astral_event_date(self.hass, "sunrise", current_date)
+                sunset = get_astral_event_date(self.hass, "sunset", current_date)
+            except (TypeError, ValueError):
+                sunrise = sunset = None
+            if sunrise is not None and sunset is not None and sunrise < sunset:
+                windows.append((sunrise, sunset))
+            current_date += timedelta(days=1)
+        return windows
+
+    def _solar_bonus_applies(
+        self, slot_time: datetime, solar_windows: list[tuple[datetime, datetime]]
+    ) -> bool:
+        """Check whether a forecast slot is between sunrise and sunset."""
+        comparable_slot = dt_util.as_local(slot_time)
+        for sunrise, sunset in solar_windows:
+            if dt_util.as_local(sunrise) <= comparable_slot < dt_util.as_local(sunset):
+                return True
+        return False
+
     def _calculate_action_schedule(self, forecast_data: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Main logic to segment and determine the optimal action schedule."""
         if not forecast_data:
@@ -173,6 +225,13 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         # 1. Prepare Data
         now = dt_util.now()
         prepared_data = []
+        forecast_datetimes = [
+            parsed_dt
+            for item in forecast_data
+            for parsed_dt in [_parse_datetime(item.get('start_date') or item.get('datetime'))]
+            if parsed_dt is not None
+        ]
+        solar_bonus_windows = self._get_solar_bonus_windows(forecast_datetimes)
         for idx, item in enumerate(forecast_data):
             # Backwards-compatible format extraction (supporting both old and new schema)
             raw_dt = item.get('start_date')
@@ -200,10 +259,28 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                 
             dt = _parse_datetime(raw_dt)
             is_passed = dt < now if dt else False
+            solar_bonus_applied = bool(
+                dt
+                and (
+                    self._solar_bonus_percent > 0
+                    or self._solar_bonus_fixed_eur_kwh > 0
+                )
+                and self._solar_bonus_applies(dt, solar_bonus_windows)
+            )
+            effective_price = price
+            if solar_bonus_applied:
+                effective_price = (
+                    price + self._solar_bonus_fixed_eur_kwh
+                ) * (1.0 + self._solar_bonus_percent / 100.0)
 
             prepared_data.append({
                 'datetime': raw_dt,
-                'price_eur_kwh': price,
+                'price_eur_kwh': effective_price,
+                'forecast_price_eur_kwh': price,
+                'solar_bonus_applied': solar_bonus_applied,
+                'solar_bonus_multiplier': round(
+                    effective_price / price, 4
+                ) if price != 0 else 1.0,
                 'price_multiplier': 1.0,
                 'action': ACTION_STOP,
                 'interval_id': -1,

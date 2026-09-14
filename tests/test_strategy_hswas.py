@@ -9,6 +9,7 @@ from custom_components.zonneplan_peakdetect.const import (
     CONF_RTE_PERCENT,
     CONF_FORECAST_ENTITY,
     CONF_ALGORITHM,
+    CONF_SOLAR_BONUS_PERCENT,
     ALGORITHM_HSWAS,
 )
 
@@ -31,6 +32,7 @@ async def test_sensor_algorithm_hswas_august_extremes(hass, freezer, august_extr
             "discharge_hours": 2.75,   # 11 quarters
             CONF_RTE_PERCENT: 20.0,
             CONF_MIN_PROFIT: 6.0,      # 6 cents
+            CONF_SOLAR_BONUS_PERCENT: 10.0, # Solar bonus enabled 10% default
         },
         entry_id="test_optimizer_entry",
     )
@@ -97,6 +99,7 @@ async def test_sensor_algorithm_hswas_july_baseline(hass, freezer, july_baseline
             "discharge_hours": 2.75,   # 11 quarters
             CONF_RTE_PERCENT: 20.0,
             CONF_MIN_PROFIT: 6.0,      # 6 cents
+            CONF_SOLAR_BONUS_PERCENT: 10.0, # Solar bonus enabled 10% default
         },
         entry_id="test_optimizer_entry",
     )
@@ -157,6 +160,7 @@ async def test_sensor_algorithm_hswas_july29(hass, freezer, july29_forecast):
             "discharge_hours": 2.75,   # 11 quarters
             CONF_RTE_PERCENT: 20.0,
             CONF_MIN_PROFIT: 6.0,      # 6 cents
+            CONF_SOLAR_BONUS_PERCENT: 10.0, # Solar bonus enabled 10% default
         },
         entry_id="test_optimizer_entry",
     )
@@ -214,6 +218,7 @@ async def test_hswas_hourly_tariff(hass, freezer):
             "discharge_hours": 2.75,   # 11 quarters -> should scale to 3 hours
             CONF_RTE_PERCENT: 20.0,
             CONF_MIN_PROFIT: 6.0,      # 6 cents
+            CONF_SOLAR_BONUS_PERCENT: 10.0, # Solar bonus enabled 10% default
         },
         entry_id="test_optimizer_entry",
     )

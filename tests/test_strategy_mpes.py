@@ -9,6 +9,8 @@ from custom_components.zonneplan_peakdetect.const import (
     CONF_RTE_PERCENT,
     CONF_FORECAST_ENTITY,
     CONF_ALGORITHM,
+    CONF_SOLAR_BONUS_PERCENT,
+    CONF_SOLAR_BONUS_FIXED_C_KWH,
     ALGORITHM_MPES,
 )
 
@@ -27,6 +29,8 @@ async def test_sensor_algorithm_mpes_september8(hass, freezer, september8_foreca
             "discharge_quarters": 11,
             CONF_RTE_PERCENT: 20.0,
             CONF_MIN_PROFIT: 6.0,      # 6 cents
+            CONF_SOLAR_BONUS_PERCENT: 0.0,
+            CONF_SOLAR_BONUS_FIXED_C_KWH: 0.0,
         },
         entry_id="test_optimizer_entry_mpes",
     )

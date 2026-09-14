@@ -17,6 +17,8 @@ CONF_MIN_PROFIT = "min_profit_c_kwh"
 CONF_FORECAST_ENTITY = "forecast_entity"
 CONF_ALGORITHM = "algorithm_type"
 CONF_MULTIPLIER_ALGORITHM = "multiplier_type"
+CONF_SOLAR_BONUS_PERCENT = "solar_bonus_percent"
+CONF_SOLAR_BONUS_FIXED_C_KWH = "solar_bonus_fixed_c_kwh"
 
 # Algorithm types
 ALGORITHM_WHSS = "whss"
@@ -37,6 +39,8 @@ DEFAULT_CHARGE_QUARTERS = 8
 DEFAULT_DISCHARGE_QUARTERS = 8
 DEFAULT_FORECAST_ENTITY = "sensor.zonneplan_current_quarter_hourly_electricity_tariff"
 DEFAULT_ALGORITHM = ALGORITHM_WHSS
+DEFAULT_SOLAR_BONUS_PERCENT = 10.0
+DEFAULT_SOLAR_BONUS_FIXED_C_KWH = 2.0
 
 # State definitions
 ACTION_CHARGE = "Charge"

@@ -9,7 +9,9 @@
           "min_profit_c_kwh": "Minimaal vereiste winst (cent/kWh)",
           "charge_quarters": "Laad kwartieren (15-min intervallen)",
           "discharge_quarters": "Ontlaad kwartieren (15-min intervallen)",
-          "forecast_entity": "Prijssensor entiteit ID"
+          "forecast_entity": "Prijssensor entiteit ID",
+          "solar_bonus_percent": "Percentage zonnebonus",
+          "solar_bonus_fixed_c_kwh": "Vaste zonnebonus (cent/kWh)"
         },
         "description": "Voer de configuratiewaarden voor de sensor in."
       },
@@ -21,7 +23,9 @@
           "min_profit_c_kwh": "Minimaal vereiste winst (cent/kWh)",
           "charge_quarters": "Laad kwartieren (15-min intervallen)",
           "discharge_quarters": "Ontlaad kwartieren (15-min intervallen)",
-          "forecast_entity": "Prijssensor entiteit ID"
+          "forecast_entity": "Prijssensor entiteit ID",
+          "solar_bonus_percent": "Percentage zonnebonus",
+          "solar_bonus_fixed_c_kwh": "Vaste zonnebonus (cent/kWh)"
         },
         "description": "Pas de configuratiewaarden voor de sensor aan."
       }
