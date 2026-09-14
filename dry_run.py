@@ -294,12 +294,25 @@ def calculate_action_schedule(
             except Exception:
                 pass
 
-    # Cleanup internal keys
-    for item in prepared_data:
-        item.pop('sort_index', None)
-    
     interval_count = len(set(item['interval_id'] for item in prepared_data if item.get('interval_id', -1) >= 0 and item.get('action') != ACTION_STOP))
-    return prepared_data, interval_count
+
+    # Format output keys
+    formatted_data = []
+    for item in prepared_data:
+        bonus_amount = round(item['sell_price_eur_kwh'] - item['price_eur_kwh'], 7) if item.get('solar_bonus_applied') else 0.0
+        formatted_item = {
+            'datetime': item['datetime'],
+            'price_eur_kwh': item['price_eur_kwh'],
+            'price_bonus_eur_kwh': bonus_amount,
+            'price_multiplier': item['price_multiplier'],
+            'action': item['action'],
+            'interval_id': item['interval_id'],
+        }
+        if 'price_multiplier_quantile' in item:
+            formatted_item['price_multiplier_quantile'] = item['price_multiplier_quantile']
+        formatted_data.append(formatted_item)
+        
+    return formatted_data, interval_count
 
 # Your original forecast dataset
 forecast_data = [
@@ -659,7 +672,7 @@ def main():
         else:
             action_str = f"{action:<10}"
 
-        bonus_val = f"{item['sell_price_eur_kwh']:.7f}" if item.get('solar_bonus_applied') else "-"
+        bonus_val = f"+{item['price_bonus_eur_kwh']:.7f}" if item.get('price_bonus_eur_kwh', 0.0) > 0.0 else "-"
 
         print(
             f"{item['datetime']:<30} | {item['price_eur_kwh']:<14.7f} | {bonus_val:<19} | {item['price_multiplier']:<11.2f} | {action_str} | {item['interval_id']:<11}"
