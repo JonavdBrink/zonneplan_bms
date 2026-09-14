@@ -1,4 +1,5 @@
 import pytest
+from datetime import datetime, timezone
 from homeassistant.const import Platform
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.zonneplan_peakdetect.const import (
@@ -12,6 +13,7 @@ from custom_components.zonneplan_peakdetect.const import (
     CONF_SOLAR_BONUS_PERCENT,
     ALGORITHM_HSWAS,
 )
+from custom_components.zonneplan_peakdetect.strategies.sliding_window import HswasStrategy
 
 async def test_sensor_algorithm_hswas_august_extremes(hass, freezer, august_extremes_forecast):
     """
@@ -270,3 +272,36 @@ async def test_hswas_hourly_tariff(hass, freezer):
     
     assert len(charge_slots) == 3
     assert len(discharge_slots) == 3
+
+
+def test_hswas_uses_buy_price_for_charging_and_sell_price_for_discharging():
+    """Charging uses the market price while discharging uses the solar-adjusted price."""
+    prepared_data = [
+        {
+            "datetime": f"2026-08-12T{hour:02d}:00:00+00:00",
+            "price_eur_kwh": buy_price,
+            "buy_price_eur_kwh": buy_price,
+            "sell_price_eur_kwh": sell_price,
+            "sort_index": index,
+            "action": "Stop",
+            "interval_id": -1,
+        }
+        for index, (hour, buy_price, sell_price) in enumerate([
+            (0, 0.20, 0.20),
+            (1, 0.10, 0.10),
+            (2, 0.30, 0.50),
+            (3, 0.25, 0.25),
+        ])
+    ]
+
+    result = HswasStrategy().calculate_schedule(
+        prepared_data,
+        charge_slots_count=1,
+        discharge_slots_count=1,
+        rte_factor=1.0,
+        min_profit_eur_kwh=0.20,
+        now=datetime.now(timezone.utc),
+    )
+
+    assert result[1]["action"] == ACTION_CHARGE
+    assert result[2]["action"] == ACTION_DISCHARGE

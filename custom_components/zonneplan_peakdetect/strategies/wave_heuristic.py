@@ -35,7 +35,8 @@ class WhssStrategy(ArbitrageStrategy):
         now: datetime
     ) -> list[dict[str, Any]]:
         """Calculates the BESS schedule using the WHSS Wave Heuristic."""
-        prices = [item['price_eur_kwh'] for item in prepared_data]
+        buy_prices = [item.get('buy_price_eur_kwh', item['price_eur_kwh']) for item in prepared_data]
+        sell_prices = [item.get('sell_price_eur_kwh', item['price_eur_kwh']) for item in prepared_data]
         n = len(prepared_data)
         current_idx = 0
         interval_count = 0
@@ -43,58 +44,58 @@ class WhssStrategy(ArbitrageStrategy):
         while current_idx < n - 1:
             # Step A: Find the NEXT local valley (dip) relative to current position
             valley_idx = current_idx
-            valley_min = prices[current_idx]
+            valley_min = buy_prices[current_idx]
             
             for j in range(current_idx, n):
                 valley_idx = j
-                if prices[j] < valley_min:
-                    valley_min = prices[j]
+                if buy_prices[j] < valley_min:
+                    valley_min = buy_prices[j]
                 # Break if price recovers significantly
-                if prices[j] >= (valley_min + min_profit_eur_kwh):
+                if buy_prices[j] >= (valley_min + min_profit_eur_kwh):
                     break
             
             # Step B: Find the NEXT local peak (hump) AFTER that specific valley
             peak_idx = valley_idx
-            peak_max = prices[valley_idx]
+            peak_max = sell_prices[valley_idx]
             
             for j in range(valley_idx, n):
                 peak_idx = j
-                if prices[j] > peak_max:
-                    peak_max = prices[j]
+                if sell_prices[j] > peak_max:
+                    peak_max = sell_prices[j]
                 # Break if price drops significantly (indicating start of next wave)
-                if prices[j] <= (peak_max - min_profit_eur_kwh):
+                if sell_prices[j] <= (peak_max - min_profit_eur_kwh):
                     break
             
             # Step C: Find the next valley index where the next wave starts
             temp_min_idx = peak_idx
-            temp_min = prices[peak_idx]
+            temp_min = buy_prices[peak_idx]
             wave_height = peak_max - valley_min
             for j in range(peak_idx, n):
-                if prices[j] < temp_min:
-                    temp_min = prices[j]
+                if buy_prices[j] < temp_min:
+                    temp_min = buy_prices[j]
                     temp_min_idx = j
                 # Break if price recovers by 1/3 of min_profit, but only after dropping by at least 40% of wave height
                 # to avoid breaking prematurely during high evening peak variations
-                if temp_min <= (peak_max - 0.40 * wave_height) and prices[j] >= temp_min + (min_profit_eur_kwh * 0.33):
+                if temp_min <= (peak_max - 0.40 * wave_height) and sell_prices[j] >= temp_min + (min_profit_eur_kwh * 0.33):
                     # Lookahead to verify if the recovery is sustained (at least 2 periods) to filter out transient spikes
-                    if j + 1 < n and prices[j+1] < temp_min + (min_profit_eur_kwh * 0.33):
+                    if j + 1 < n and sell_prices[j+1] < temp_min + (min_profit_eur_kwh * 0.33):
                         continue
                     break
             
             # Find the local minimum during the transition
             local_min_idx = peak_idx
-            local_min_val = prices[peak_idx]
+            local_min_val = buy_prices[peak_idx]
             for k in range(peak_idx, temp_min_idx):
-                if prices[k] < local_min_val:
-                    local_min_val = prices[k]
+                if buy_prices[k] < local_min_val:
+                    local_min_val = buy_prices[k]
                     local_min_idx = k
             
             # Find the local maximum (shoulder) before the next descent
             boundary_idx = local_min_idx
-            boundary_val = prices[local_min_idx]
+            boundary_val = sell_prices[local_min_idx]
             for k in range(local_min_idx, temp_min_idx + 1):
-                if prices[k] > boundary_val:
-                    boundary_val = prices[k]
+                if sell_prices[k] > boundary_val:
+                    boundary_val = sell_prices[k]
                     boundary_idx = k
             
             segment_end = boundary_idx
@@ -115,16 +116,16 @@ class WhssStrategy(ArbitrageStrategy):
             # Process if profit threshold is met, taking round-trip efficiency into account
             if (peak_max * rte_factor - valley_min) >= min_profit_eur_kwh:                
                 # CHARGE: Select cheapest hours in this wave before the valley
-                charge_cands = [h for h in segment if h['sort_index'] < valley_idx and peak_max * rte_factor - h['price_eur_kwh'] >= min_profit_eur_kwh]
-                charge_cands.sort(key=lambda x: x['price_eur_kwh'])
+                charge_cands = [h for h in segment if h['sort_index'] < valley_idx and peak_max * rte_factor - h.get('buy_price_eur_kwh', h['price_eur_kwh']) >= min_profit_eur_kwh]
+                charge_cands.sort(key=lambda x: x.get('buy_price_eur_kwh', x['price_eur_kwh']))
                 if not charge_cands:
                     current_idx = segment_end
                     continue
                 charge_slots = charge_cands[:charge_slots_count]
                                 
                 # DISCHARGE: Select most expensive hours in this wave after the valley
-                discharge_cands = [h for h in segment if h['sort_index'] >= valley_idx and h['price_eur_kwh'] * rte_factor - valley_min >= min_profit_eur_kwh]
-                discharge_cands.sort(key=lambda x: x['price_eur_kwh'], reverse=True)
+                discharge_cands = [h for h in segment if h['sort_index'] >= valley_idx and h.get('sell_price_eur_kwh', h['price_eur_kwh']) * rte_factor - valley_min >= min_profit_eur_kwh]
+                discharge_cands.sort(key=lambda x: x.get('sell_price_eur_kwh', x['price_eur_kwh']), reverse=True)
                 if not discharge_cands:
                     current_idx = segment_end
                     continue

@@ -74,12 +74,12 @@ During the integrations setup flow (or via **Configure**), you can customize the
 | **Charge Quarters** | `charge_quarters` | `8` | Maximum charging duration (in 15-minute quarters) allowed per price wave/interval (e.g., `8` quarters = 2 hours). |
 | **Discharge Quarters** | `discharge_quarters` | `8` | Maximum discharging duration (in 15-minute quarters) allowed per price wave/interval (e.g., `8` quarters = 2 hours). |
 | **Price Delta %** | `price_delta_percent` | `20` | Percentage threshold used for calculating price multipliers in attributes. |
-| **Solar Bonus %** | `solar_bonus_percent` | `10` | Price bonus applied around sunrise and sunset. Set to `0` to disable it. |
+| **Solar Bonus %** | `solar_bonus_percent` | `10` | Sell-price bonus applied between sunrise and sunset. Set to `0` to disable it. |
 | **Fixed Solar Bonus** | `solar_bonus_fixed_c_kwh` | `2` | Fixed solar bonus added in cents/kWh around sunrise and sunset. Set to `0` to disable it. |
 
 *Note: If you are upgrading from an older version, your existing `charge_hours` and `discharge_hours` settings are automatically converted to quarters (`hours * 4`) for seamless backwards compatibility.*
 
-The default solar bonus is calculated as `(market price + 2 cents/kWh) + 10%`, meaning the 10% is applied after adding the fixed 2 cents/kWh component. The optimizer applies it to forecast slots from astronomical sunrise up to (but not including) sunset. The original forecast price is retained as `forecast_price_eur_kwh`, while `price_eur_kwh` contains the effective price used for scheduling. The schedule also exposes `solar_bonus_applied` and `solar_bonus_multiplier` for each slot.
+The default solar bonus is calculated as `(market price + 2 cents/kWh) * 1.10`, and applies only to the sell price between astronomical sunrise and sunset. The buy price remains the market price. The original forecast price is retained as `forecast_price_eur_kwh`; `buy_price_eur_kwh` is the price used for charging and `sell_price_eur_kwh` is the price used for discharging. The schedule also exposes `solar_bonus_applied` and `solar_bonus_multiplier` for each slot.
 
 ---
 
@@ -103,6 +103,8 @@ The integration registers a single sensor, `sensor.battery_optimizer_action` (En
     {
       "datetime": "2026-07-25T14:00:00+02:00",
       "price_eur_kwh": 0.28,
+      "buy_price_eur_kwh": 0.28,
+      "sell_price_eur_kwh": 0.33,
       "price_multiplier": 1.15,
       "action": "Stop",
       "interval_id": 0

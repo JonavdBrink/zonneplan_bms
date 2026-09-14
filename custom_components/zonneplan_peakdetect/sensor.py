@@ -275,7 +275,9 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
 
             prepared_data.append({
                 'datetime': raw_dt,
-                'price_eur_kwh': effective_price,
+                'price_eur_kwh': price,
+                'buy_price_eur_kwh': price,
+                'sell_price_eur_kwh': effective_price,
                 'forecast_price_eur_kwh': price,
                 'solar_bonus_applied': solar_bonus_applied,
                 'solar_bonus_multiplier': round(

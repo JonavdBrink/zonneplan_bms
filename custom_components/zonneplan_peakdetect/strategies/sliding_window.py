@@ -27,7 +27,8 @@ class HswasStrategy(ArbitrageStrategy):
         now: datetime
     ) -> list[dict[str, Any]]:
         """Calculates the BESS schedule using the Advanced (HSWAS) [β] Sliding Window."""
-        prices = [item['price_eur_kwh'] for item in prepared_data]
+        buy_prices = [item.get('buy_price_eur_kwh', item['price_eur_kwh']) for item in prepared_data]
+        sell_prices = [item.get('sell_price_eur_kwh', item['price_eur_kwh']) for item in prepared_data]
         n = len(prepared_data)
         current_idx = 0
         interval_count = 0
@@ -43,11 +44,11 @@ class HswasStrategy(ArbitrageStrategy):
                 
                 for i in range(current_idx, search_limit - charge_slots_count + 1):
                     charge_slice = range(i, i + charge_slots_count)
-                    avg_charge = sum(prices[k] for k in charge_slice) / charge_slots_count
+                    avg_charge = sum(buy_prices[k] for k in charge_slice) / charge_slots_count
                     
                     for j in range(i + charge_slots_count, search_limit - discharge_slots_count + 1):
                         discharge_slice = range(j, j + discharge_slots_count)
-                        avg_discharge = sum(prices[k] for k in discharge_slice) / discharge_slots_count
+                        avg_discharge = sum(sell_prices[k] for k in discharge_slice) / discharge_slots_count
                         
                         profit = avg_discharge * rte_factor - avg_charge
                         
@@ -61,20 +62,18 @@ class HswasStrategy(ArbitrageStrategy):
                     segment_end = best_discharge_idx + discharge_slots_count
                     
                     segment = prepared_data[segment_start : segment_end]
-                    segment_prices = [h['price_eur_kwh'] for h in segment]
-                    
-                    local_valley_val = min(segment_prices)
-                    local_peak_val = max(segment_prices)
+                    local_valley_val = min(h.get('buy_price_eur_kwh', h['price_eur_kwh']) for h in segment)
+                    local_peak_val = max(h.get('sell_price_eur_kwh', h['price_eur_kwh']) for h in segment)
                     
                     charge_pool = prepared_data[segment_start : best_discharge_idx]
                     discharge_pool = prepared_data[best_discharge_idx : segment_end]
                     
-                    charge_cands = [h for h in charge_pool if local_peak_val * rte_factor - h['price_eur_kwh'] >= min_profit_eur_kwh]
-                    charge_cands.sort(key=lambda x: x['price_eur_kwh'])
+                    charge_cands = [h for h in charge_pool if local_peak_val * rte_factor - h.get('buy_price_eur_kwh', h['price_eur_kwh']) >= min_profit_eur_kwh]
+                    charge_cands.sort(key=lambda x: x.get('buy_price_eur_kwh', x['price_eur_kwh']))
                     charge_slots = charge_cands[:charge_slots_count]
                     
-                    discharge_cands = [h for h in discharge_pool if h['price_eur_kwh'] * rte_factor - local_valley_val >= min_profit_eur_kwh]
-                    discharge_cands.sort(key=lambda x: x['price_eur_kwh'], reverse=True)
+                    discharge_cands = [h for h in discharge_pool if h.get('sell_price_eur_kwh', h['price_eur_kwh']) * rte_factor - local_valley_val >= min_profit_eur_kwh]
+                    discharge_cands.sort(key=lambda x: x.get('sell_price_eur_kwh', x['price_eur_kwh']), reverse=True)
                     discharge_slots = discharge_cands[:discharge_slots_count]
                     
                     if charge_slots or discharge_slots:
