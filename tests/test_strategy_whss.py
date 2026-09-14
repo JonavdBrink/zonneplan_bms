@@ -9,6 +9,8 @@ from custom_components.zonneplan_peakdetect.const import (
     CONF_RTE_PERCENT,
     CONF_FORECAST_ENTITY,
     CONF_ALGORITHM,
+    CONF_SOLAR_BONUS_PERCENT,
+    CONF_SOLAR_BONUS_FIXED_C_KWH,
     ALGORITHM_WHSS,
 )
 
@@ -31,6 +33,8 @@ async def test_sensor_algorithm_wave_heuristic_august_extremes(hass, freezer, au
             "discharge_hours": 2.75,   # 11 quarters
             CONF_RTE_PERCENT: 20.0,
             CONF_MIN_PROFIT: 6.0,      # 6 cents
+            CONF_SOLAR_BONUS_PERCENT: 0.0,
+            CONF_SOLAR_BONUS_FIXED_C_KWH: 0.0,
         },
         entry_id="test_optimizer_entry",
     )
@@ -97,6 +101,8 @@ async def test_sensor_algorithm_wave_heuristic_july_baseline(hass, freezer, july
             "discharge_hours": 2.75,   # 11 quarters
             CONF_RTE_PERCENT: 20.0,
             CONF_MIN_PROFIT: 6.0,      # 6 cents
+            CONF_SOLAR_BONUS_PERCENT: 0.0,
+            CONF_SOLAR_BONUS_FIXED_C_KWH: 0.0,
         },
         entry_id="test_optimizer_entry",
     )
@@ -157,6 +163,8 @@ async def test_sensor_algorithm_wave_heuristic_july29(hass, freezer, july29_fore
             "discharge_hours": 2.75,   # 11 quarters
             CONF_RTE_PERCENT: 20.0,
             CONF_MIN_PROFIT: 6.0,      # 6 cents
+            CONF_SOLAR_BONUS_PERCENT: 0.0,
+            CONF_SOLAR_BONUS_FIXED_C_KWH: 0.0,
         },
         entry_id="test_optimizer_entry",
     )
@@ -211,6 +219,8 @@ async def test_whss_hourly_tariff(hass, freezer):
             "discharge_hours": 2.75,   # 11 quarters -> should scale to 3 hours
             CONF_RTE_PERCENT: 20.0,
             CONF_MIN_PROFIT: 6.0,      # 6 cents
+            CONF_SOLAR_BONUS_PERCENT: 0.0,
+            CONF_SOLAR_BONUS_FIXED_C_KWH: 0.0,
         },
         entry_id="test_optimizer_entry",
     )

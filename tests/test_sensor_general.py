@@ -1,4 +1,6 @@
 import pytest
+from datetime import datetime, timezone
+from unittest.mock import MagicMock, patch
 from homeassistant.const import Platform
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.zonneplan_peakdetect.const import (
@@ -9,9 +11,37 @@ from custom_components.zonneplan_peakdetect.const import (
     CONF_FORECAST_ENTITY,
     CONF_ALGORITHM,
     CONF_MULTIPLIER_ALGORITHM,
+    CONF_SOLAR_BONUS_PERCENT,
+    CONF_SOLAR_BONUS_FIXED_C_KWH,
     MULTIPLIER_CPWL,
     ALGORITHM_WHSS,
 )
+from custom_components.zonneplan_peakdetect.sensor import BatteryOptimizerSensor
+
+
+def test_solar_bonus_applies_between_sunrise_and_sunset():
+    """Solar bonus applies throughout daylight, but not at sunset."""
+    sensor = BatteryOptimizerSensor.__new__(BatteryOptimizerSensor)
+    sensor.hass = MagicMock()
+    sensor._solar_bonus_percent = 10.0
+    sunrise = datetime(2026, 8, 12, 6, 0, tzinfo=timezone.utc)
+    sunset = datetime(2026, 8, 12, 21, 0, tzinfo=timezone.utc)
+
+    def astral_event(_hass, event, _date):
+        return sunrise if event == "sunrise" else sunset
+
+    with patch(
+        "custom_components.zonneplan_peakdetect.sensor.get_astral_event_date",
+        side_effect=astral_event,
+    ):
+        windows = sensor._get_solar_bonus_windows([sunrise])
+
+    assert sensor._solar_bonus_applies(
+        datetime(2026, 8, 12, 12, 0, tzinfo=timezone.utc), windows
+    )
+    assert not sensor._solar_bonus_applies(
+        datetime(2026, 8, 12, 21, 0, tzinfo=timezone.utc), windows
+    )
 
 async def test_sensor_empty_forecast(hass):
     """Test sensor behavior with an empty forecast dataset."""
@@ -23,6 +53,8 @@ async def test_sensor_empty_forecast(hass):
             "discharge_hours": 2.75,   # 11 quarters
             CONF_RTE_PERCENT: 20.0,
             CONF_MIN_PROFIT: 6.0,      # 6 cents
+            CONF_SOLAR_BONUS_PERCENT: 0.0,
+            CONF_SOLAR_BONUS_FIXED_C_KWH: 0.0,
         },
         entry_id="test_optimizer_entry",
     )
@@ -62,6 +94,8 @@ async def test_sensor_price_multiplier_fallback(hass):
             "discharge_hours": 1.0,
             CONF_RTE_PERCENT: 10.0,
             CONF_MIN_PROFIT: 10.0,  # 10 cents required, so no wave will be scheduled
+            CONF_SOLAR_BONUS_PERCENT: 0.0,
+            CONF_SOLAR_BONUS_FIXED_C_KWH: 0.0,
         },
         entry_id="test_optimizer_entry_fallback",
     )
@@ -117,6 +151,8 @@ async def test_sensor_price_multiplier_windowed(hass, freezer):
             "discharge_hours": 1.0,    # 4 quarters (1 hour)
             CONF_RTE_PERCENT: 0.0,     # No efficiency loss to keep math simple
             CONF_MIN_PROFIT: 6.0,      # 6 cents (0.06 EUR)
+            CONF_SOLAR_BONUS_PERCENT: 0.0,
+            CONF_SOLAR_BONUS_FIXED_C_KWH: 0.0,
         },
         entry_id="test_optimizer_entry_windowed",
     )

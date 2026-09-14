@@ -11,7 +11,9 @@
           "min_profit_c_kwh": "Minimum profit required (cents/kWh)",
           "charge_quarters": "Charge quarters (15-min intervals)",
           "discharge_quarters": "Discharge quarters (15-min intervals)",
-          "forecast_entity": "Price forecast entity ID"
+          "forecast_entity": "Price forecast entity ID",
+          "solar_bonus_percent": "Solar bonus percentage",
+          "solar_bonus_fixed_c_kwh": "Fixed solar bonus (cents/kWh)"
         },
         "description": "Enter the configuration values for the sensor."
       },
@@ -24,7 +26,9 @@
           "min_profit_c_kwh": "Minimum profit required (cents/kWh)",
           "charge_quarters": "Charge quarters (15-min intervals)",
           "discharge_quarters": "Discharge quarters (15-min intervals)",
-          "forecast_entity": "Price forecast entity ID"
+          "forecast_entity": "Price forecast entity ID",
+          "solar_bonus_percent": "Solar bonus percentage",
+          "solar_bonus_fixed_c_kwh": "Fixed solar bonus (cents/kWh)"
         },
         "description": "Adjust the configuration values for the sensor."
       }
