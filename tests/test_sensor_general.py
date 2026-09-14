@@ -219,13 +219,13 @@ async def test_sensor_price_multiplier_windowed(hass, freezer):
 
     # Verify new sensor attributes for automation
     assert state.attributes.get("current_price_multiplier") == 0.91  # multiplier of current interval (index 5)
-    quartiles = state.attributes.get("price_multiplier_quartiles")
-    assert quartiles is not None
-    assert "min" in quartiles
-    assert "q25" in quartiles
-    assert "q50" in quartiles
-    assert "q75" in quartiles
-    assert "max" in quartiles
-    assert quartiles["min"] == 0.91
-    assert quartiles["max"] == 4.29
+    quantiles = state.attributes.get("price_multiplier_quantiles")
+    assert quantiles is not None
+    assert "min" in quantiles
+    assert "q25" in quantiles
+    assert "q50" in quantiles
+    assert "q75" in quantiles
+    assert "max" in quantiles
+    assert quantiles["min"] == 0.91
+    assert quantiles["max"] == 4.29
 

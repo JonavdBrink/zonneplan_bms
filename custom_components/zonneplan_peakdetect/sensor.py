@@ -150,7 +150,7 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
             "solar_bonus_percent": self._solar_bonus_percent,
             "solar_bonus_fixed_c_kwh": solar_bonus_fixed_c_kwh,
             "current_price_multiplier": 1.0,
-            "price_multiplier_quartiles": None,
+            "price_multiplier_quantiles": None,
         }
         self._attr_device_info = DeviceInfo(
             identifiers={(DOMAIN, entry_id)},
@@ -329,7 +329,7 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                 iid = item.get('interval_id', -1)
                 if item.get('action') != ACTION_STOP:
                     if iid >= 0:
-                        price = item['price_eur_kwh']
+                        price = item.get('buy_price_eur_kwh', item['price_eur_kwh'])
                         if iid not in valleys or price < valleys[iid]['price']:
                             valleys[iid] = {'idx': idx, 'price': price}
             
@@ -338,9 +338,9 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
             
             if not active_wave_ids:
                 # Fallback to absolute minimum of the entire forecast if no active waves are found
-                global_min = min(item['price_eur_kwh'] for item in schedule)
+                global_min = min(item.get('buy_price_eur_kwh', item['price_eur_kwh']) for item in schedule)
                 for item in schedule:
-                    p = item['price_eur_kwh']
+                    p = item.get('sell_price_eur_kwh', item['price_eur_kwh'])
                     item['price_multiplier'] = round(p / global_min, 2) if global_min > 0 else round(1.0 + p / abs(global_min), 2) if global_min != 0 else 1.0
                     item['interval_id'] = -1
             else:
@@ -384,15 +384,15 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                     for start, end in windows:
                         window_slice = schedule[start:end]
                         if window_slice:
-                            window_min = min(item['price_eur_kwh'] for item in window_slice)
+                            window_min = min(item.get('buy_price_eur_kwh', item['price_eur_kwh']) for item in window_slice)
                             for item in window_slice:
-                                p = item['price_eur_kwh']
+                                p = item.get('sell_price_eur_kwh', item['price_eur_kwh'])
                                 item['price_multiplier'] = round(p / window_min, 2) if window_min > 0 else round(1.0 + p / abs(window_min), 2) if window_min != 0 else 1.0
                 else: # MULTIPLIER_CPWL
                     anchors = [(valleys[iid]['idx'], valleys[iid]['price']) for iid in active_wave_ids]
                     
                     for idx, item in enumerate(schedule):
-                        p = item['price_eur_kwh']
+                        p = item.get('sell_price_eur_kwh', item['price_eur_kwh'])
                         
                         # If before the first valley, lock to first valley price
                         if idx <= anchors[0][0]:
@@ -459,13 +459,13 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
 
         self._attr_extra_state_attributes['current_price_multiplier'] = current_multiplier
 
-        # Expose the statistical quartiles of the price multipliers over the entire scheduled forecast
+        # Expose the statistical quantiles of the price multipliers over the entire scheduled forecast
         multipliers = [i.get('price_multiplier', 1.0) for i in schedule]
         if len(multipliers) >= 2:
             import statistics
             try:
                 q = statistics.quantiles(multipliers, n=4)
-                self._attr_extra_state_attributes['price_multiplier_quartiles'] = {
+                self._attr_extra_state_attributes['price_multiplier_quantiles'] = {
                     'min': round(min(multipliers), 2),
                     'q25': round(q[0], 2),
                     'q50': round(q[1], 2),
@@ -473,9 +473,9 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                     'max': round(max(multipliers), 2)
                 }
             except Exception as e:
-                LOGGER.warning("Failed to calculate price multiplier quartiles: %s", e)
-                self._attr_extra_state_attributes['price_multiplier_quartiles'] = None
+                LOGGER.warning("Failed to calculate price multiplier quantiles: %s", e)
+                self._attr_extra_state_attributes['price_multiplier_quantiles'] = None
         else:
-            self._attr_extra_state_attributes['price_multiplier_quartiles'] = None
+            self._attr_extra_state_attributes['price_multiplier_quantiles'] = None
 
         LOGGER.debug("Current BESS action set to: %s", self._attr_native_value)
