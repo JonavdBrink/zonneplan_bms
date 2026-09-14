@@ -28,10 +28,11 @@ class MpesStrategy(ArbitrageStrategy):
         if n < 2:
             return prepared_data
 
-        prices = [item['price_eur_kwh'] for item in prepared_data]
+        buy_prices = [item.get('buy_price_eur_kwh', item['price_eur_kwh']) for item in prepared_data]
+        sell_prices = [item.get('sell_price_eur_kwh', item['price_eur_kwh']) for item in prepared_data]
 
         # 1. Schmitt-Trigger Swing Filter to find major valleys and peaks
-        swings = self._find_major_swings(prices, min_profit_eur_kwh)
+        swings = self._find_major_swings(sell_prices, min_profit_eur_kwh)
 
         # 2. Pair alternating valleys and peaks into distinct cycles
         cycles = []
@@ -39,9 +40,9 @@ class MpesStrategy(ArbitrageStrategy):
             if swings[i]['type'] == 'valley' and swings[i+1]['type'] == 'peak':
                 cycles.append({
                     'valley_idx': swings[i]['idx'],
-                    'valley_price': swings[i]['price'],
+                    'valley_price': buy_prices[swings[i]['idx']],
                     'peak_idx': swings[i+1]['idx'],
-                    'peak_price': swings[i+1]['price']
+                    'peak_price': sell_prices[swings[i+1]['idx']]
                 })
 
         # 3. Schedule slot allocation per cycle
@@ -66,15 +67,15 @@ class MpesStrategy(ArbitrageStrategy):
 
             # Select and sort candidates
             # Sort charge candidates ascending (cheapest first)
-            charge_cands = sorted(charge_segment_indices, key=lambda x: prices[x])
+            charge_cands = sorted(charge_segment_indices, key=lambda x: buy_prices[x])
             # Only keep charge candidates that are profitable relative to peak
-            charge_cands = [x for x in charge_cands if c['peak_price'] * rte_factor - prices[x] >= min_profit_eur_kwh]
+            charge_cands = [x for x in charge_cands if c['peak_price'] * rte_factor - buy_prices[x] >= min_profit_eur_kwh]
             charge_slots = charge_cands[:charge_slots_count]
 
             # Sort discharge candidates descending (most expensive first)
-            discharge_cands = sorted(discharge_segment_indices, key=lambda x: prices[x], reverse=True)
+            discharge_cands = sorted(discharge_segment_indices, key=lambda x: sell_prices[x], reverse=True)
             # Only keep discharge candidates that are profitable relative to valley
-            discharge_cands = [x for x in discharge_cands if prices[x] * rte_factor - c['valley_price'] >= min_profit_eur_kwh]
+            discharge_cands = [x for x in discharge_cands if sell_prices[x] * rte_factor - c['valley_price'] >= min_profit_eur_kwh]
             discharge_slots = discharge_cands[:discharge_slots_count]
 
             # Balance slots to ensure symmetric charge/discharge cycle
