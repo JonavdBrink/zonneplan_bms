@@ -3,8 +3,8 @@ from typing import Any
 import homeassistant.util.dt as dt_util
 
 from ..const import (
-    ACTION_CHARGE,
-    ACTION_DISCHARGE,
+    ACTION_BUY,
+    ACTION_SELL,
     ACTION_STOP,
 )
 from .base import ArbitrageStrategy
@@ -81,10 +81,10 @@ class HswasStrategy(ArbitrageStrategy):
                             s['interval_id'] = interval_count
                             
                         for s in charge_slots:
-                            s['action'] = ACTION_CHARGE
+                            s['action'] = ACTION_BUY
                             
                         for s in discharge_slots:
-                            s['action'] = ACTION_DISCHARGE
+                            s['action'] = ACTION_SELL
                             
                         interval_count += 1
                         

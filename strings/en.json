@@ -1,5 +1,9 @@
 {
   "config": {
+    "error": {
+      "quantile_order_error": "Discharge threshold must be higher than the charge threshold.",
+      "quantile_guard_band_error": "RTE percentage must be a technical guard band between the charge and discharge percentages."
+    },
     "step": {
       "user": {
         "data": {
@@ -11,7 +15,9 @@
           "discharge_quarters": "Discharge quarters (15-min intervals)",
           "forecast_entity": "Price forecast entity ID",
           "solar_bonus_percent": "Solar bonus percentage",
-          "solar_bonus_fixed_c_kwh": "Fixed solar bonus (cents/kWh)"
+          "solar_bonus_fixed_c_kwh": "Fixed solar bonus (cents/kWh)",
+          "charge_multiplier_quantile": "Charge (saving) multiplier quantile",
+          "discharge_multiplier_quantile": "Discharge (consuming) multiplier quantile"
         },
         "description": "Enter the configuration values for the sensor."
       },
@@ -25,7 +31,9 @@
           "discharge_quarters": "Discharge quarters (15-min intervals)",
           "forecast_entity": "Price forecast entity ID",
           "solar_bonus_percent": "Solar bonus percentage",
-          "solar_bonus_fixed_c_kwh": "Fixed solar bonus (cents/kWh)"
+          "solar_bonus_fixed_c_kwh": "Fixed solar bonus (cents/kWh)",
+          "charge_multiplier_quantile": "Charge (saving) multiplier quantile",
+          "discharge_multiplier_quantile": "Discharge (consuming) multiplier quantile"
         },
         "description": "Adjust the configuration values for the sensor."
       }

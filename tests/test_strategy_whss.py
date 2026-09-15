@@ -5,6 +5,8 @@ from custom_components.zonneplan_peakdetect.const import (
     DOMAIN,
     ACTION_CHARGE,
     ACTION_DISCHARGE,
+    ACTION_BUY,
+    ACTION_SELL,
     CONF_MIN_PROFIT,
     CONF_RTE_PERCENT,
     CONF_FORECAST_ENTITY,
@@ -73,17 +75,17 @@ async def test_sensor_algorithm_wave_heuristic_august_extremes(hass, freezer, au
     
     # Analyze Interval 2 (August 13 cycle, which has zero-based index 1)
     interval_2_slots = [item for item in schedule if item.get("interval_id") == 1]
-    charge_slots = [item for item in interval_2_slots if item["action"] == ACTION_CHARGE]
-    discharge_slots = [item for item in interval_2_slots if item["action"] == ACTION_DISCHARGE]
+    buy_slots = [item for item in interval_2_slots if item["action"] == ACTION_BUY]
+    sell_slots = [item for item in interval_2_slots if item["action"] == ACTION_SELL]
     
     # Assert balanced slot counts are correct (scaled to min(13, 11) = 11)
-    assert len(charge_slots) == 11
-    assert len(discharge_slots) == 11
+    assert len(buy_slots) == 11
+    assert len(sell_slots) == 11
     
     # Assert chronological safety: Charge happens before Discharge
-    charge_indices = [interval_2_slots.index(item) for item in charge_slots]
-    discharge_indices = [interval_2_slots.index(item) for item in discharge_slots]
-    assert max(charge_indices) < min(discharge_indices)
+    buy_indices = [interval_2_slots.index(item) for item in buy_slots]
+    sell_indices = [interval_2_slots.index(item) for item in sell_slots]
+    assert max(buy_indices) < min(sell_indices)
 
 async def test_sensor_algorithm_wave_heuristic_july_baseline(hass, freezer, july_baseline_forecast):
     """
@@ -141,13 +143,13 @@ async def test_sensor_algorithm_wave_heuristic_july_baseline(hass, freezer, july
     # Chronological safety checking for all 3 scheduled intervals (index 0, 1, 2)
     for interval_id in range(3):
         interval_slots = [item for item in schedule if item.get("interval_id") == interval_id]
-        charge_slots = [item for item in interval_slots if item["action"] == ACTION_CHARGE]
-        discharge_slots = [item for item in interval_slots if item["action"] == ACTION_DISCHARGE]
+        buy_slots = [item for item in interval_slots if item["action"] == ACTION_BUY]
+        sell_slots = [item for item in interval_slots if item["action"] == ACTION_SELL]
         
-        if charge_slots and discharge_slots:
-            charge_indices = [interval_slots.index(item) for item in charge_slots]
-            discharge_indices = [interval_slots.index(item) for item in discharge_slots]
-            assert max(charge_indices) < min(discharge_indices)
+        if buy_slots and sell_slots:
+            buy_indices = [interval_slots.index(item) for item in buy_slots]
+            sell_indices = [interval_slots.index(item) for item in sell_slots]
+            assert max(buy_indices) < min(sell_indices)
 
 async def test_sensor_algorithm_wave_heuristic_july29(hass, freezer, july29_forecast):
     """
@@ -197,13 +199,13 @@ async def test_sensor_algorithm_wave_heuristic_july29(hass, freezer, july29_fore
     # Chronological validation on all intervals found
     for interval_id in range(intervals):
         interval_slots = [item for item in schedule if item.get("interval_id") == interval_id]
-        charge_slots = [item for item in interval_slots if item["action"] == ACTION_CHARGE]
-        discharge_slots = [item for item in interval_slots if item["action"] == ACTION_DISCHARGE]
+        buy_slots = [item for item in interval_slots if item["action"] == ACTION_BUY]
+        sell_slots = [item for item in interval_slots if item["action"] == ACTION_SELL]
         
-        if charge_slots and discharge_slots:
-            charge_indices = [interval_slots.index(item) for item in charge_slots]
-            discharge_indices = [interval_slots.index(item) for item in discharge_slots]
-            assert max(charge_indices) < min(discharge_indices)
+        if buy_slots and sell_slots:
+            buy_indices = [interval_slots.index(item) for item in buy_slots]
+            sell_indices = [interval_slots.index(item) for item in sell_slots]
+            assert max(buy_indices) < min(sell_indices)
 
 async def test_whss_hourly_tariff(hass, freezer):
     """
@@ -267,8 +269,8 @@ async def test_whss_hourly_tariff(hass, freezer):
     assert len(schedule) == 24
     
     # Verify that slot counts scaled to exactly 3 hours of charge and 3 hours of discharge
-    charge_slots = [item for item in schedule if item["action"] == ACTION_CHARGE]
-    discharge_slots = [item for item in schedule if item["action"] == ACTION_DISCHARGE]
+    buy_slots = [item for item in schedule if item["action"] == ACTION_BUY]
+    sell_slots = [item for item in schedule if item["action"] == ACTION_SELL]
     
-    assert len(charge_slots) == 3
-    assert len(discharge_slots) == 3
+    assert len(buy_slots) == 3
+    assert len(sell_slots) == 3

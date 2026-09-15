@@ -6,6 +6,10 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.zonneplan_peakdetect.const import (
     DOMAIN,
     ACTION_STOP,
+    ACTION_CHARGE,
+    ACTION_DISCHARGE,
+    ACTION_BUY,
+    ACTION_SELL,
     CONF_MIN_PROFIT,
     CONF_RTE_PERCENT,
     CONF_FORECAST_ENTITY,
@@ -13,6 +17,8 @@ from custom_components.zonneplan_peakdetect.const import (
     CONF_MULTIPLIER_ALGORITHM,
     CONF_SOLAR_BONUS_PERCENT,
     CONF_SOLAR_BONUS_FIXED_C_KWH,
+    CONF_CHARGE_QUANTILE,
+    CONF_DISCHARGE_QUANTILE,
     MULTIPLIER_CPWL,
     ALGORITHM_WHSS,
 )
@@ -228,4 +234,185 @@ async def test_sensor_price_multiplier_windowed(hass, freezer):
     assert "max" in quantiles
     assert quantiles["min"] == 0.91
     assert quantiles["max"] == 4.29
+
+
+async def test_sensor_self_consumption_charge_discharge(hass, freezer):
+    """Test self-consumption Charge and Discharge scheduling based on multiplier quantiles."""
+    freezer.move_to("2026-08-12T05:59:00+00:00")
+    
+    # Configure the sensor with specific charge and discharge quantiles
+    config_entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_FORECAST_ENTITY: "sensor.zonneplan_forecast",
+            CONF_ALGORITHM: ALGORITHM_WHSS,
+            CONF_MULTIPLIER_ALGORITHM: MULTIPLIER_CPWL,
+            "charge_hours": 1.0,       # 4 quarters (1 hour)
+            "discharge_hours": 1.0,    # 4 quarters (1 hour)
+            CONF_RTE_PERCENT: 0.0,
+            CONF_MIN_PROFIT: 6.0,      # 6 cents
+            CONF_SOLAR_BONUS_PERCENT: 0.0,
+            CONF_SOLAR_BONUS_FIXED_C_KWH: 0.0,
+            CONF_CHARGE_QUANTILE: 50.0,
+            CONF_DISCHARGE_QUANTILE: 75.0,
+        },
+        entry_id="test_optimizer_entry_self_consumption",
+    )
+    config_entry.add_to_hass(hass)
+
+    # Mock sunrise/sunset: 6:00 to 21:00 is daytime.
+    # We construct a 24-hour forecast
+    forecast = []
+    for h in range(24):
+        # Base price is 0.20
+        price = 0.20
+        # Valley 1: 4:00 (0.05) - night
+        if h == 4:
+            price = 0.05
+        # Daytime valley: 12:00 (0.08) - day
+        elif h == 12:
+            price = 0.08
+        # Daytime cheap slot (not valley): 13:00 (0.12) - day
+        elif h == 13:
+            price = 0.12
+        # Peak 1: 8:00 (0.30) - day
+        elif h == 8:
+            price = 0.30
+        # Peak 2: 20:00 (0.35) - day/sunset
+        elif h == 20:
+            price = 0.35
+            
+        forecast.append({
+            "datetime": f"2026-08-12T{h:02d}:00:00+00:00",
+            "price_eur_kwh": price
+        })
+
+    hass.states.async_set(
+        "sensor.zonneplan_forecast",
+        "0.20",
+        {"forecast": forecast}
+    )
+
+    # Mock get_astral_event_date for daylight window checks
+    sunrise = datetime(2026, 8, 12, 6, 0, tzinfo=timezone.utc)
+    sunset = datetime(2026, 8, 12, 21, 0, tzinfo=timezone.utc)
+
+    def astral_event(_hass, event, _date):
+        return sunrise if event == "sunrise" else sunset
+
+    with patch(
+        "custom_components.zonneplan_peakdetect.sensor.get_astral_event_date",
+        side_effect=astral_event,
+    ):
+        await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    # Retrieve sensor state
+    state = hass.states.get("sensor.battery_optimizer_action")
+    assert state is not None
+    
+    # Assert extra config is correctly read
+    assert state.attributes.get("charge_multiplier_quantile") == 50.0
+    assert state.attributes.get("discharge_multiplier_quantile") == 75.0
+
+    schedule = state.attributes.get("schedule")
+    assert schedule is not None
+
+    # Let's inspect specific items in the schedule:
+    # 1. Daytime valley (12:00, index 12): Should be ACTION_BUY (the high priority arbitrage slot)
+    item_12 = schedule[12]
+    assert item_12["action"] == ACTION_BUY
+
+    # 2. Daytime cheap slot (13:00, index 13): Should be ACTION_CHARGE (self-consumption Charge/saving)
+    # as price multiplier is low and sun is up.
+    item_13 = schedule[13]
+    assert item_13["action"] == ACTION_CHARGE
+
+    # 3. Night-time valley (4:00, index 4): Should be ACTION_BUY (the arbitrage slot)
+    item_4 = schedule[4]
+    assert item_4["action"] == ACTION_BUY
+
+    # 4. Peak 2 (20:00, index 20): Should be ACTION_SELL (the arbitrage slot)
+    item_20 = schedule[20]
+    assert item_20["action"] == ACTION_SELL
+
+    # 5. Night-time high price (3:00, index 3): Should be ACTION_DISCHARGE (self-consumption Discharge/consuming)
+    # because price multiplier is high (>= q75).
+    item_3 = schedule[3]
+    assert item_3["action"] == ACTION_DISCHARGE
+
+
+async def test_config_flow_quantile_validation(hass):
+    """Test that config flow correctly validates quantile parameters and RTE guard band."""
+    from custom_components.zonneplan_peakdetect.const import (
+        DOMAIN,
+        CONF_CHARGE_QUANTILE,
+        CONF_DISCHARGE_QUANTILE,
+        CONF_RTE_PERCENT,
+    )
+    
+    result = await hass.config_entries.flow.async_init(
+        DOMAIN, context={"source": "user"}
+    )
+    assert result["type"] == "form"
+    assert result["errors"] == {}
+
+    # 1. Test order validation error: discharge < charge
+    result2 = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            "algorithm_type": "whss",
+            "multiplier_type": "block",
+            CONF_RTE_PERCENT: 20.0,
+            "min_profit_c_kwh": 6,
+            "charge_quarters": 8,
+            "discharge_quarters": 8,
+            "forecast_entity": "sensor.zonneplan_forecast",
+            "solar_bonus_percent": 10.0,
+            "solar_bonus_fixed_c_kwh": 2.0,
+            CONF_CHARGE_QUANTILE: 60.0,
+            CONF_DISCHARGE_QUANTILE: 50.0, # lower than charge!
+        },
+    )
+    assert result2["type"] == "form"
+    assert result2["errors"] == {"base": "quantile_order_error"}
+
+    # 2. Test guard band validation error: discharge < charge + rte (e.g. 70 < 60 + 20)
+    result3 = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            "algorithm_type": "whss",
+            "multiplier_type": "block",
+            CONF_RTE_PERCENT: 20.0,
+            "min_profit_c_kwh": 6,
+            "charge_quarters": 8,
+            "discharge_quarters": 8,
+            "forecast_entity": "sensor.zonneplan_forecast",
+            "solar_bonus_percent": 10.0,
+            "solar_bonus_fixed_c_kwh": 2.0,
+            CONF_CHARGE_QUANTILE: 60.0,
+            CONF_DISCHARGE_QUANTILE: 70.0, # 70 < 60 + 20
+        },
+    )
+    assert result3["type"] == "form"
+    assert result3["errors"] == {"base": "quantile_guard_band_error"}
+
+    # 3. Test successful validation
+    result4 = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {
+            "algorithm_type": "whss",
+            "multiplier_type": "block",
+            CONF_RTE_PERCENT: 20.0,
+            "min_profit_c_kwh": 6,
+            "charge_quarters": 8,
+            "discharge_quarters": 8,
+            "forecast_entity": "sensor.zonneplan_forecast",
+            "solar_bonus_percent": 10.0,
+            "solar_bonus_fixed_c_kwh": 2.0,
+            CONF_CHARGE_QUANTILE: 50.0,
+            CONF_DISCHARGE_QUANTILE: 75.0, # 75 >= 50 + 20 -> OK!
+        },
+    )
+    assert result4["type"] == "create_entry"
 

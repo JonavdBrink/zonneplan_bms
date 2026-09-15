@@ -5,6 +5,8 @@ from custom_components.zonneplan_peakdetect.const import (
     DOMAIN,
     ACTION_CHARGE,
     ACTION_DISCHARGE,
+    ACTION_BUY,
+    ACTION_SELL,
     CONF_MIN_PROFIT,
     CONF_RTE_PERCENT,
     CONF_FORECAST_ENTITY,
@@ -58,9 +60,9 @@ async def test_sensor_algorithm_mpes_september8(hass, freezer, september8_foreca
     assert len(schedule) == len(september8_forecast)
 
     # Find slots for September 8 midday (around index 96)
-    # Check that 13:00 (index 96) is scheduled as Charge
+    # Check that 13:00 (index 96) is scheduled as Buy
     item_1300 = next(x for x in schedule if x["datetime"] == "2026-09-08T13:00:00+02:00")
-    assert item_1300["action"] == ACTION_CHARGE
+    assert item_1300["action"] == ACTION_BUY
 
     # Check that 13:45 (index 99) is STOP (correctly skipped the midday hump!)
     item_1345 = next(x for x in schedule if x["datetime"] == "2026-09-08T13:45:00+02:00")
@@ -70,7 +72,7 @@ async def test_sensor_algorithm_mpes_september8(hass, freezer, september8_foreca
 def test_mpes_strategy_raw():
     """Directly tests the MpesStrategy class on a simple mock price curve with a midday hump."""
     from custom_components.zonneplan_peakdetect.strategies.mpes import MpesStrategy
-    from custom_components.zonneplan_peakdetect.const import ACTION_CHARGE, ACTION_DISCHARGE, ACTION_STOP
+    from custom_components.zonneplan_peakdetect.const import ACTION_BUY, ACTION_SELL, ACTION_STOP
     import datetime
 
     strategy = MpesStrategy()
@@ -107,16 +109,16 @@ def test_mpes_strategy_raw():
         now=datetime.datetime.now()
     )
 
-    # Valley 1 (0.05) should be scheduled as Charge (Interval 0)
-    assert res[4]['action'] == ACTION_CHARGE
+    # Valley 1 (0.05) should be scheduled as Buy (Interval 0)
+    assert res[4]['action'] == ACTION_BUY
     assert res[4]['interval_id'] == 0
-    assert res[5]['action'] == ACTION_CHARGE
+    assert res[5]['action'] == ACTION_BUY
     assert res[5]['interval_id'] == 0
 
-    # Evening peak (0.45) should be scheduled as Discharge (Interval 1)
-    assert res[18]['action'] == ACTION_DISCHARGE
+    # Evening peak (0.45) should be scheduled as Sell (Interval 1)
+    assert res[18]['action'] == ACTION_SELL
     assert res[18]['interval_id'] == 1
-    assert res[19]['action'] == ACTION_DISCHARGE
+    assert res[19]['action'] == ACTION_SELL
     assert res[19]['interval_id'] == 1
 
     # Midday hump/dip (indices 8 and 10) should be Stop (correctly filtered out by hysteresis!)
