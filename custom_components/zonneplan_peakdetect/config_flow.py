@@ -33,6 +33,10 @@ from .const import (
     CONF_SOLAR_BONUS_FIXED_C_KWH,
     DEFAULT_SOLAR_BONUS_PERCENT,
     DEFAULT_SOLAR_BONUS_FIXED_C_KWH,
+    CONF_CHARGE_QUANTILE,
+    CONF_DISCHARGE_QUANTILE,
+    DEFAULT_CHARGE_QUANTILE,
+    DEFAULT_DISCHARGE_QUANTILE,
     DOMAIN,
 )
 
@@ -100,31 +104,65 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     DEFAULT_SOLAR_BONUS_FIXED_C_KWH,
                 )
             ): vol.All(vol.Coerce(float), vol.Range(min=0.0, max=100.0)),
+            vol.Required(
+                CONF_CHARGE_QUANTILE,
+                default=user_input.get(CONF_CHARGE_QUANTILE, DEFAULT_CHARGE_QUANTILE)
+            ): vol.All(vol.Coerce(float), vol.Range(min=0.0, max=100.0)),
+            vol.Required(
+                CONF_DISCHARGE_QUANTILE,
+                default=user_input.get(CONF_DISCHARGE_QUANTILE, DEFAULT_DISCHARGE_QUANTILE)
+            ): vol.All(vol.Coerce(float), vol.Range(min=0.0, max=100.0)),
         })
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Handle the initial step."""
+        errors: dict[str, str] = {}
         if user_input is not None:
-            return self.async_create_entry(
-                title="Battery Optimizer settings", 
-                data=user_input
-            )
+            charge = user_input.get(CONF_CHARGE_QUANTILE)
+            discharge = user_input.get(CONF_DISCHARGE_QUANTILE)
+            rte = user_input.get(CONF_RTE_PERCENT)
+            
+            if charge is not None and discharge is not None and rte is not None:
+                if discharge < charge:
+                    errors["base"] = "quantile_order_error"
+                elif discharge < charge + rte:
+                    errors["base"] = "quantile_guard_band_error"
+            
+            if not errors:
+                return self.async_create_entry(
+                    title="Battery Optimizer settings", 
+                    data=user_input
+                )
 
         return self.async_show_form(
             step_id="user", 
-            data_schema=self._get_schema()
+            data_schema=self._get_schema(user_input),
+            errors=errors,
         )
 
     async def async_step_reconfigure(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Handle reconfiguration."""
         entry = self._get_reconfigure_entry()
+        errors: dict[str, str] = {}
         if user_input is not None:
-            return self.async_update_reload_and_abort(
-                entry, 
-                data=user_input
-            )
+            charge = user_input.get(CONF_CHARGE_QUANTILE)
+            discharge = user_input.get(CONF_DISCHARGE_QUANTILE)
+            rte = user_input.get(CONF_RTE_PERCENT)
+            
+            if charge is not None and discharge is not None and rte is not None:
+                if discharge < charge:
+                    errors["base"] = "quantile_order_error"
+                elif discharge < charge + rte:
+                    errors["base"] = "quantile_guard_band_error"
+            
+            if not errors:
+                return self.async_update_reload_and_abort(
+                    entry, 
+                    data=user_input
+                )
 
         return self.async_show_form(
             step_id="reconfigure",
-            data_schema=self._get_schema(entry.data),
+            data_schema=self._get_schema(user_input or entry.data),
+            errors=errors,
         )

@@ -13,8 +13,10 @@ from homeassistant.helpers.sun import get_astral_event_date
 from homeassistant.util import dt as dt_util
 
 from .const import (
-    ACTION_CHARGE,
-    ACTION_DISCHARGE,
+    ACTION_SAVE,
+    ACTION_CONSUME,
+    ACTION_BUY,
+    ACTION_SELL,
     ACTION_STOP,
     CONF_CHARGE_QUARTERS,
     CONF_DISCHARGE_QUARTERS,
@@ -25,12 +27,16 @@ from .const import (
     CONF_MULTIPLIER_ALGORITHM,
     CONF_SOLAR_BONUS_PERCENT,
     CONF_SOLAR_BONUS_FIXED_C_KWH,
+    CONF_CHARGE_QUANTILE,
+    CONF_DISCHARGE_QUANTILE,
     DEFAULT_ALGORITHM,
     DEFAULT_MULTIPLIER_ALGORITHM,
     DEFAULT_CENTS,
     DEFAULT_PERCENTAGE,
     DEFAULT_SOLAR_BONUS_PERCENT,
     DEFAULT_SOLAR_BONUS_FIXED_C_KWH,
+    DEFAULT_CHARGE_QUANTILE,
+    DEFAULT_DISCHARGE_QUANTILE,
     MULTIPLIER_CPWL,
     MULTIPLIER_BLOCK,
     DOMAIN,
@@ -77,6 +83,8 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: Any, async_add_en
         CONF_SOLAR_BONUS_FIXED_C_KWH,
         DEFAULT_SOLAR_BONUS_FIXED_C_KWH,
     )
+    charge_multiplier_quantile = config.get(CONF_CHARGE_QUANTILE, DEFAULT_CHARGE_QUANTILE)
+    discharge_multiplier_quantile = config.get(CONF_DISCHARGE_QUANTILE, DEFAULT_DISCHARGE_QUANTILE)
 
     async_add_entities([
         BatteryOptimizerSensor(
@@ -90,6 +98,8 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: Any, async_add_en
             multiplier_type,
             solar_bonus_percent,
             solar_bonus_fixed_c_kwh,
+            charge_multiplier_quantile,
+            discharge_multiplier_quantile,
             SENSOR_DESCRIPTION
         )
     ], True)
@@ -121,6 +131,8 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         multiplier_type: str,
         solar_bonus_percent: float,
         solar_bonus_fixed_c_kwh: float,
+        charge_multiplier_quantile: float,
+        discharge_multiplier_quantile: float,
         description: SensorEntityDescription
     ) -> None:
         """Initialize the sensor."""
@@ -135,6 +147,8 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         self._multiplier_type = multiplier_type
         self._solar_bonus_percent = solar_bonus_percent
         self._solar_bonus_fixed_eur_kwh = solar_bonus_fixed_c_kwh / 100.0
+        self._charge_multiplier_quantile = charge_multiplier_quantile
+        self._discharge_multiplier_quantile = discharge_multiplier_quantile
         # Convert minimal profit from cents/kWh to €/kWh
         self._min_profit_eur_kwh = min_profit_c_kwh / 100.0
         self._attr_native_value = ACTION_STOP
@@ -149,6 +163,8 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
             "multiplier_type": self._multiplier_type,
             "solar_bonus_percent": self._solar_bonus_percent,
             "solar_bonus_fixed_c_kwh": solar_bonus_fixed_c_kwh,
+            "charge_multiplier_quantile": self._charge_multiplier_quantile,
+            "discharge_multiplier_quantile": self._discharge_multiplier_quantile,
             "current_price_multiplier": 1.0,
             "current_price_bonus": 0.0,
             "current_solar_bonus_price": 0.0,
@@ -216,6 +232,21 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
             if dt_util.as_local(sunrise) <= comparable_slot < dt_util.as_local(sunset):
                 return True
         return False
+
+    def _get_quantile_value(self, multipliers: list[float], pct: float) -> float | None:
+        """Safely calculate and return the price multiplier threshold value for a given percentile (0-100)."""
+        if not multipliers:
+            return None
+        sorted_multipliers = sorted(multipliers)
+        n = len(sorted_multipliers)
+        if n == 1:
+            return sorted_multipliers[0]
+        
+        idx = (pct / 100.0) * (n - 1)
+        low = int(idx)
+        high = min(n - 1, low + 1)
+        weight = idx - low
+        return round((1.0 - weight) * sorted_multipliers[low] + weight * sorted_multipliers[high], 2)
 
     def _calculate_action_schedule(self, forecast_data: list[dict[str, Any]]) -> list[dict[str, Any]]:
         """Main logic to segment and determine the optimal action schedule."""
@@ -417,8 +448,26 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                         # Compute multiplier
                         item['price_multiplier'] = round(p / divisor, 2) if divisor > 0 else round(1.0 + p / abs(divisor), 2) if divisor != 0 else 1.0
 
+        # Apply Charge/Discharge logic based on multiplier quantiles
+        if n > 0:
+            multipliers = [item.get('price_multiplier', 1.0) for item in schedule]
+            charge_threshold = self._get_quantile_value(multipliers, self._charge_multiplier_quantile)
+            discharge_threshold = self._get_quantile_value(multipliers, self._discharge_multiplier_quantile)
+
+            for item in schedule:
+                if item.get('action') == ACTION_STOP:
+                    dt = _parse_datetime(item.get('datetime'))
+                    sun_above_horizon = bool(
+                        dt and self._solar_bonus_applies(dt, solar_bonus_windows)
+                    )
+                    mult = item.get('price_multiplier', 1.0)
+                    if sun_above_horizon and charge_threshold is not None and mult < charge_threshold:
+                        item['action'] = ACTION_SAVE
+                    elif discharge_threshold is not None and mult >= discharge_threshold:
+                        item['action'] = ACTION_CONSUME
+
         # Read total active interval count directly from scheduled data attributes
-        intervals = len(set(h['interval_id'] for h in schedule if h.get('interval_id', -1) >= 0 and h.get('action') != ACTION_STOP))
+        intervals = len(set(h['interval_id'] for h in schedule if h.get('interval_id', -1) >= 0 and h.get('action') in (ACTION_BUY, ACTION_SELL)))
         self._attr_extra_state_attributes['intervals'] = intervals
 
         # Format output keys for Home Assistant attributes
@@ -474,16 +523,14 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
 
         # Expose the statistical quantiles of the price multipliers over the entire scheduled forecast
         multipliers = [i.get('price_multiplier', 1.0) for i in schedule]
-        if len(multipliers) >= 2:
-            import statistics
+        if multipliers:
             try:
-                q = statistics.quantiles(multipliers, n=4)
                 self._attr_extra_state_attributes['price_multiplier_quantiles'] = {
-                    'min': round(min(multipliers), 2),
-                    'q25': round(q[0], 2),
-                    'q50': round(q[1], 2),
-                    'q75': round(q[2], 2),
-                    'max': round(max(multipliers), 2)
+                    'min': self._get_quantile_value(multipliers, 0.0),
+                    'q25': self._get_quantile_value(multipliers, 25.0),
+                    'q50': self._get_quantile_value(multipliers, 50.0),
+                    'q75': self._get_quantile_value(multipliers, 75.0),
+                    'max': self._get_quantile_value(multipliers, 100.0)
                 }
             except Exception as e:
                 LOGGER.warning("Failed to calculate price multiplier quantiles: %s", e)

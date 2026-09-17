@@ -2,8 +2,8 @@ from datetime import datetime
 from typing import Any
 
 from ..const import (
-    ACTION_CHARGE,
-    ACTION_DISCHARGE,
+    ACTION_BUY,
+    ACTION_SELL,
     ACTION_STOP,
 )
 from .base import ArbitrageStrategy
@@ -85,10 +85,10 @@ class MpesStrategy(ArbitrageStrategy):
 
             if num_slots > 0:
                 for x in charge_slots:
-                    prepared_data[x]['action'] = ACTION_CHARGE
+                    prepared_data[x]['action'] = ACTION_BUY
                     prepared_data[x]['interval_id'] = interval_count
                 for x in discharge_slots:
-                    prepared_data[x]['action'] = ACTION_DISCHARGE
+                    prepared_data[x]['action'] = ACTION_SELL
                     prepared_data[x]['interval_id'] = interval_count
                 
                 interval_count += 1
