@@ -6,8 +6,8 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.zonneplan_peakdetect.const import (
     DOMAIN,
     ACTION_STOP,
-    ACTION_CHARGE,
-    ACTION_DISCHARGE,
+    ACTION_SAVE,
+    ACTION_CONSUME,
     ACTION_BUY,
     ACTION_SELL,
     CONF_MIN_PROFIT,
@@ -323,10 +323,10 @@ async def test_sensor_self_consumption_charge_discharge(hass, freezer):
     item_12 = schedule[12]
     assert item_12["action"] == ACTION_BUY
 
-    # 2. Daytime cheap slot (13:00, index 13): Should be ACTION_CHARGE (self-consumption Charge/saving)
+    # 2. Daytime cheap slot (13:00, index 13): Should be ACTION_SAVE (self-consumption Save)
     # as price multiplier is low and sun is up.
     item_13 = schedule[13]
-    assert item_13["action"] == ACTION_CHARGE
+    assert item_13["action"] == ACTION_SAVE
 
     # 3. Night-time valley (4:00, index 4): Should be ACTION_BUY (the arbitrage slot)
     item_4 = schedule[4]
@@ -336,10 +336,10 @@ async def test_sensor_self_consumption_charge_discharge(hass, freezer):
     item_20 = schedule[20]
     assert item_20["action"] == ACTION_SELL
 
-    # 5. Night-time high price (3:00, index 3): Should be ACTION_DISCHARGE (self-consumption Discharge/consuming)
+    # 5. Night-time high price (3:00, index 3): Should be ACTION_CONSUME (self-consumption Consume)
     # because price multiplier is high (>= q75).
     item_3 = schedule[3]
-    assert item_3["action"] == ACTION_DISCHARGE
+    assert item_3["action"] == ACTION_CONSUME
 
 
 async def test_config_flow_quantile_validation(hass):

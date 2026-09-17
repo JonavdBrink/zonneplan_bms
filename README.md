@@ -18,7 +18,8 @@ Repository based on: [fsaris/home-assistant-zonneplan-one](https://github.com/fs
 
 ## 🚀 Features
 
-- **Optimal Action State**: Exposes a main sensor that dictates whether your battery should `Charge`, `Discharge`, or `Stop` in real-time.
+- **Optimal Action State**: Exposes a main sensor that dictates whether your battery should `Buy`, `Sell`, `Charge`, `Discharge`, or `Stop` in real-time.
+- **Self-Consumption Modes**: Introduces customizable `Charge` (saving solar during day) and `Discharge` (consuming battery for local loads) modes on idle slots based on price multiplier percentile thresholds.
 - **Native Quarterly (15-Minute) Support**: Built to dynamically detect and support both **hourly** (60-minute) and **quarter-hourly** (15-minute) price forecasts. It seamlessly scales your configuration settings (e.g. `charge_quarters` is adjusted dynamically depending on interval spacing) and evaluates state matches at exact interval resolutions.
 - **Intelligent Wave-Segmentation Algorithm**: Divides the forecast into localized price "waves" to detect multiple profitable cycles within a single day.
 - **Dynamic Energy Balancing**: Constrains the charge slots in each interval by the number of profitable discharge slots to maintain energy balance.
@@ -38,8 +39,8 @@ The **Standard (WHSS)** algorithm is the original and proven optimization engine
 2. **Peak Detection**: After the local valley, the algorithm tracks prices to find a subsequent local peak (hump). This peak search stops when prices drop by more than the minimum profit threshold, indicating the end of the wave and the start of the next cycle.
 3. **Threshold Check**: An interval is only deemed profitable if the maximum peak price minus the minimum valley price (after incorporating the battery's Round-Trip Efficiency) is greater than or equal to your configured minimum profit.
 4. **Slot Selection (Balanced)**:
-   - **Charge Slots**: Selects the cheapest slots *before* the valley within the current wave where the price is low enough to yield the required profit.
-   - **Discharge Slots**: Selects the most expensive slots *after* the valley within the current wave where the price is high enough to yield the required profit.
+   - **Buy Slots (Grid Charging)**: Selects the cheapest slots *before* the valley within the current wave where the price is low enough to yield the required profit.
+   - **Sell Slots (Grid Feeding)**: Selects the most expensive slots *after* the valley within the current wave where the price is high enough to yield the required profit.
    - To prevent over-charging/under-discharging, the scheduled charging slots are constrained by the number of available profitable discharging slots in that wave.
 
 ---
@@ -73,9 +74,11 @@ During the integrations setup flow (or via **Configure**), you can customize the
 | **Minimum Profit** | `min_profit_c_kwh` | `6` | The minimum price difference (in cents per kWh) required between charge and discharge intervals to trigger an action. |
 | **Charge Quarters** | `charge_quarters` | `8` | Maximum charging duration (in 15-minute quarters) allowed per price wave/interval (e.g., `8` quarters = 2 hours). |
 | **Discharge Quarters** | `discharge_quarters` | `8` | Maximum discharging duration (in 15-minute quarters) allowed per price wave/interval (e.g., `8` quarters = 2 hours). |
-| **Price Delta %** | `price_delta_percent` | `20` | Percentage threshold used for calculating price multipliers in attributes. |
+| **Price Delta %** | `price_delta_percent` | `20` | Percentage threshold used for calculating price multipliers in attributes. This value acts as a technical guard band between your charge and discharge quantiles. |
 | **Solar Bonus %** | `solar_bonus_percent` | `10` | Sell-price bonus applied between sunrise and sunset. Set to `0` to disable it. |
 | **Fixed Solar Bonus** | `solar_bonus_fixed_c_kwh` | `2` | Fixed solar bonus added in cents/kWh around sunrise and sunset. Set to `0` to disable it. |
+| **Charge Quantile** | `charge_multiplier_quantile` | `50.0` | Percentile (0 to 100) of the price multiplier below which solar energy is saved to the battery (`Charge` action) during daytime. |
+| **Discharge Quantile** | `discharge_multiplier_quantile` | `75.0` | Percentile (0 to 100) of the price multiplier above which the battery is discharged for own consumption (`Discharge` action). Must be strictly higher than the Charge Quantile plus the Price Delta %. |
 
 *Note: If you are upgrading from an older version, your existing `charge_hours` and `discharge_hours` settings are automatically converted to quarters (`hours * 4`) for seamless backwards compatibility.*
 
@@ -88,9 +91,11 @@ The default solar bonus is calculated as `(market price + 2 cents/kWh) * 1.10`, 
 The integration registers a single sensor, `sensor.battery_optimizer_action` (Entity ID is dynamic based on setup).
 
 ### State
-- **`Charge`**: Battery should be charging from the grid.
-- **`Discharge`**: Battery should be exporting to the grid / powering the home.
-- **`Stop`**: Battery should stand by (neither charge nor discharge).
+- **`Buy`**: Battery should be charging from the grid (dynamic pricing arbitrage).
+- **`Sell`**: Battery should be exporting / feeding into the grid (dynamic pricing arbitrage).
+- **`Charge`**: Battery should be charging from own solar / saving solar (self-consumption).
+- **`Discharge`**: Battery should be powering the home / consuming battery (self-consumption).
+- **`Stop`**: Battery should stand by (idle).
 
 ### Attributes
 - **`intervals`**: The number of profitable arbitrage intervals/cycles currently scheduled.
@@ -113,7 +118,7 @@ The integration registers a single sensor, `sensor.battery_optimizer_action` (En
       "datetime": "2026-07-25T14:15:00+02:00",
       "price_eur_kwh": 0.18,
       "price_multiplier": 0.74,
-      "action": "Charge",
+      "action": "Buy",
       "interval_id": 0
     }
   ]
@@ -125,7 +130,7 @@ The integration registers a single sensor, `sensor.battery_optimizer_action` (En
   - **`buy_price_eur_kwh`**: The price used for charging (€/kWh) - this is always the raw market price.
   - **`sell_price_eur_kwh`**: The price used for discharging (€/kWh) - this is the raw market price, optionally including the solar bonus (Zonnebonus) during active daylight hours if enabled.
   - **`price_multiplier`**: Calculated price multiplier value relative to the interval's minimum.
-  - **`action`**: The recommended battery action (`Charge`, `Discharge`, or `Stop`).
+  - **`action`**: The recommended battery action (`Buy`, `Sell`, `Charge`, `Discharge`, or `Stop`).
   - **`interval_id`**: The ID of the assigned chronological interval/cycle (`-1` for unassigned / gaps).
 
 ---
@@ -166,13 +171,254 @@ The integration registers a single sensor, `sensor.battery_optimizer_action` (En
 
 ---
 
+## 📈 Lovelace Plotly Graph Visualization
+
+<details>
+  <summary><b>Click to expand Plotly Graph Configuration</b></summary>
+
+You can visualize your current and upcoming BESS action schedule (with `Buy`, `Sell`, `Stop`, `Charge`, and `Discharge` states color-coded beautifully) over a rolling 36-hour window using the popular [Lovelace Plotly Graph Card](https://github.com/dbuezas/lovelace-plotly-graph-card).
+
+Add the following custom card configuration to your Home Assistant dashboard:
+
+```yaml
+type: custom:plotly-graph
+hours_to_show: 36
+time_offset: 24h
+refresh_interval: 10
+disable_pinch_to_zoom: true
+fn: |-
+  $ex {
+    /**
+     * ---=== Configuration section ===---
+     */
+    vars.rowHeight = 50;
+    vars.topMargin = 30;
+    vars.bottomMargin = 95;
+    vars.leftMargin = 60;
+    vars.rightMargin = 20;
+    vars.rowFillPercentage = 0.8;
+    vars.barWidth = 40;
+    vars.xAxisLineWidth = 2;
+    vars.yAxisLineWidth = 2;
+    vars.yGrid = false;
+
+    vars.rowConfiigurations = {
+      1: {
+        'sensor': 'sensor.battery_optimizer_action',
+        'displayName': 'Schedule',
+      }
+    };
+
+    vars.rowValueColor = function(cv) {
+      switch (cv) {
+        case 1: return 'rgba(76, 175, 80, .6)';   // Buy (Green)
+        case 2: return 'rgba(244, 67, 54, .6)';   // Sell (Red)
+        case 3: return 'rgba(158, 158, 158, .6)'; // Stop (Grey)
+        case 4: return 'rgba(255, 193, 7, .6)';   // Save (Yellow/Gold)
+        case 5: return 'rgba(33, 150, 243, .6)';  // Consume (Blue)
+      }
+    };
+
+    /**
+     * ---=== End Configuration ===---
+     */
+    vars.row = 0;
+    vars.yVisibility = {};
+
+    vars.fillIntervalGaps = function (dataset, rowConfiigurations, row) {
+      const xy = [];
+      for (let i = 0; i < dataset.length; i++) {
+        const currentEntry = dataset[i];
+        xy.push([currentEntry[0], currentEntry[1]]);
+        if (i < dataset.length - 1) {
+          const nextEntry = dataset[i + 1];
+          // Fill until next timestamp to create the "bar" effect
+          xy.push([nextEntry[0], currentEntry[1]]);
+        }
+      }
+      return xy;
+    };
+
+    vars.buildData = function (xs, ys, row, rowConfiigurations, rowValueIndex) {
+      const actionMap = { 'Buy': 1, 'Sell': 2, 'Stop': 3, 'Save': 4, 'Consume': 5 };
+      const displayName = rowConfiigurations[row].displayName;
+      const mappedYs = ys.map((y) => (actionMap[y] !== rowValueIndex) ? null : displayName);
+      const dataset = xs.map((x, i) => [x, mappedYs[i]]);
+      const xy = vars.fillIntervalGaps(dataset, rowConfiigurations, row);
+      return {
+        xs: xy.map(item => item[0]),
+        ys: xy.map(item => item[1])
+      };
+    };
+
+    vars.calculateYDomain = function (layouty, row, yincrement) {
+      return [((layouty - 1) * yincrement), (layouty * yincrement * vars.rowFillPercentage)];
+    };
+  }
+entities:
+  - entity: ''
+    internal: true
+    fn: |-
+      $fn ({ vars }) => {
+        vars.row++;
+        vars.rowValueIndex = 0;
+        vars.valueToPush = {};
+      }
+  - entity: sensor.battery_optimizer_action
+    attribute: schedule
+    fn: $fn ({ vars }) => { vars.rowValueIndex++; }
+    name: Buy
+    yaxis: y1
+    filters:
+      - fn: |-
+          ({xs, ys, vars, meta, states, statistics, hass}) => {
+            const entity = hass.states['sensor.battery_optimizer_action'];
+            const s = entity?.attributes?.schedule || [];
+            return vars.buildData(s.map(i => new Date(i.datetime).getTime()), s.map(i => i.action), vars.row, vars.rowConfiigurations, vars.rowValueIndex);
+          }
+      - fn: |-
+          ({xs, ys, vars, meta, states, statistics, hass}) => {
+            vars.valueToPush[vars.rowValueIndex] = ys.includes(vars.rowConfiigurations[vars.row].displayName);
+          }
+    line:
+      width: $ex vars.barWidth
+      color: $ex vars.rowValueColor(1)
+  - entity: sensor.battery_optimizer_action
+    attribute: schedule
+    fn: $fn ({ vars }) => { vars.rowValueIndex++; }
+    name: Sell
+    yaxis: y1
+    filters:
+      - fn: |-
+          ({xs, ys, vars, meta, states, statistics, hass}) => {
+            const entity = hass.states["sensor.battery_optimizer_action"];
+            const s = entity?.attributes?.schedule || [];
+            return vars.buildData(s.map(i => new Date(i.datetime).getTime()), s.map(i => i.action), vars.row, vars.rowConfiigurations, vars.rowValueIndex);
+          }
+      - fn: |-
+          ({xs, ys, vars, meta, states, statistics, hass}) => {
+            vars.valueToPush[vars.rowValueIndex] = ys.includes(vars.rowConfiigurations[vars.row].displayName);
+          }
+    line:
+      width: $ex vars.barWidth
+      color: $ex vars.rowValueColor(2)
+  - entity: sensor.battery_optimizer_action
+    attribute: schedule
+    fn: $fn ({ vars }) => { vars.rowValueIndex++; }
+    name: Stop
+    yaxis: y1
+    filters:
+      - fn: |-
+          ({xs, ys, vars, meta, states, statistics, hass}) => {
+            const entity = hass.states["sensor.battery_optimizer_action"];
+            const s = entity?.attributes?.schedule || [];
+            return vars.buildData(s.map(i => new Date(i.datetime).getTime()), s.map(i => i.action), vars.row, vars.rowConfiigurations, vars.rowValueIndex);
+          }
+      - fn: |-
+          ({xs, ys, vars, meta, states, statistics, hass}) => {
+            vars.valueToPush[vars.rowValueIndex] = ys.includes(vars.rowConfiigurations[vars.row].displayName);
+          }
+    line:
+      width: $ex vars.barWidth
+      color: $ex vars.rowValueColor(3)
+  - entity: sensor.battery_optimizer_action
+    attribute: schedule
+    fn: $fn ({ vars }) => { vars.rowValueIndex++; }
+    name: Save
+    yaxis: y1
+    filters:
+      - fn: |-
+          ({xs, ys, vars, meta, states, statistics, hass}) => {
+            const entity = hass.states["sensor.battery_optimizer_action"];
+            const s = entity?.attributes?.schedule || [];
+            return vars.buildData(s.map(i => new Date(i.datetime).getTime()), s.map(i => i.action), vars.row, vars.rowConfiigurations, vars.rowValueIndex);
+          }
+      - fn: |-
+          ({xs, ys, vars, meta, states, statistics, hass}) => {
+            vars.valueToPush[vars.rowValueIndex] = ys.includes(vars.rowConfiigurations[vars.row].displayName);
+          }
+    line:
+      width: $ex vars.barWidth
+      color: $ex vars.rowValueColor(4)
+  - entity: sensor.battery_optimizer_action
+    attribute: schedule
+    fn: $fn ({ vars }) => { vars.rowValueIndex++; }
+    name: Consume
+    yaxis: y1
+    filters:
+      - fn: |-
+          ({xs, ys, vars, meta, states, statistics, hass}) => {
+            const entity = hass.states["sensor.battery_optimizer_action"];
+            const s = entity?.attributes?.schedule || [];
+            return vars.buildData(s.map(i => new Date(i.datetime).getTime()), s.map(i => i.action), vars.row, vars.rowConfiigurations, vars.rowValueIndex);
+          }
+      - fn: |-
+          ({xs, ys, vars, meta, states, statistics, hass}) => {
+            vars.valueToPush[vars.rowValueIndex] = ys.includes(vars.rowConfiigurations[vars.row].displayName);
+            vars.yVisibility[vars.row] = vars.valueToPush;
+          }
+    line:
+      width: $ex vars.barWidth
+      color: $ex vars.rowValueColor(5)
+  - entity: ''
+    name: Now
+    yaxis: y2
+    showlegend: false
+    line:
+      width: 1
+      dash: dot
+      color: white
+    x: $ex [Date.now(), Date.now()]
+    'y':
+      - 0
+      - 1
+layout:
+  fn: |-
+    $fn({ vars }) => {
+      vars.rowConfiigurationsVisible = 1;
+      vars.rowVisibility = [true];
+      vars.yincrement = 1;
+      vars.rowDomain = [vars.calculateYDomain(1, 1, 1)];
+    }
+  margin:
+    t: $ex vars.topMargin
+    b: $ex vars.bottomMargin
+    l: $ex vars.leftMargin
+    r: $ex vars.rightMargin
+  height: $ex (vars.rowHeight * 1) + vars.topMargin + vars.bottomMargin
+  yaxis:
+    fn: $fn ({ vars }) => { vars.layouty = 1; }
+    domain: $ex vars.rowDomain[0]
+    linewidth: $ex vars.yAxisLineWidth
+    showgrid: $ex vars.yGrid
+    tickvals:
+      - 0
+    fixedrange: true
+  yaxis2:
+    visible: false
+    fixedrange: true
+  xaxis:
+    type: date
+    linewidth: $ex vars.xaxisLineWidth
+    dtick: 10800000
+    tickangle: -45
+grid_options:
+  columns: full
+```
+</details>
+
+---
+
 ## 🤖 Automation Example
+
+<details>
+  <summary><b>Click to expand Home Assistant Automation Example</b></summary>
 
 Use the state of the Battery Optimizer sensor in your Home Assistant automations to automatically trigger battery controls (e.g. for Victron ESS, Solax, Growatt, Huawei BESS).
 
 ```yaml
 alias: "Battery - Grid Arbitrage Control"
-description: "Automatically charge, discharge, or idle the home battery based on Zonneplan BMS schedule"
+description: "Automatically charge, discharge, save solar, or idle the home battery based on Zonneplan BMS schedule"
 trigger:
   - platform: state
     entity_id: sensor.battery_optimizer_action
@@ -182,7 +428,7 @@ action:
       - conditions:
           - condition: state
             entity_id: sensor.battery_optimizer_action
-            state: "Charge"
+            state: "Buy"
         sequence:
           - service: number.set_value
             target:
@@ -198,13 +444,35 @@ action:
       - conditions:
           - condition: state
             entity_id: sensor.battery_optimizer_action
-            state: "Discharge"
+            state: "Sell"
         sequence:
           - service: select.select_option
             target:
               entity_id: select.battery_mode
             data:
               option: "Export to grid"
+
+      - conditions:
+          - condition: state
+            entity_id: sensor.battery_optimizer_action
+            state: "Charge"
+        sequence:
+          - service: select.select_option
+            target:
+              entity_id: select.battery_mode
+            data:
+              option: "Self-consumption" # Save solar in the battery
+
+      - conditions:
+          - condition: state
+            entity_id: sensor.battery_optimizer_action
+            state: "Discharge"
+        sequence:
+          - service: select.select_option
+            target:
+              entity_id: select.battery_mode
+            data:
+              option: "Self-consumption" # Discharge to cover local household consumption
               
       - conditions:
           - condition: state
@@ -215,9 +483,10 @@ action:
             target:
               entity_id: select.battery_mode
             data:
-              option: "Self-consumption / Idle"
+              option: "Idle"
 mode: restart
 ```
+</details>
 
 ---
 

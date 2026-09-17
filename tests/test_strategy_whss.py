@@ -3,8 +3,6 @@ from homeassistant.const import Platform
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 from custom_components.zonneplan_peakdetect.const import (
     DOMAIN,
-    ACTION_CHARGE,
-    ACTION_DISCHARGE,
     ACTION_BUY,
     ACTION_SELL,
     CONF_MIN_PROFIT,

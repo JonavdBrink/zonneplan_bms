@@ -2,8 +2,8 @@
   "title": "Zonneplan Peak Detect",
   "config": {
     "error": {
-      "quantile_order_error": "De ontlaaddrempel moet hoger zijn dan de laaddrempel.",
-      "quantile_guard_band_error": "Het RTE-percentage moet een technische veiligheidsmarge zijn tussen de laad- en ontlaadpercentages."
+      "quantile_order_error": "De verbruiksdrempel moet hoger zijn dan de opslagdrempel.",
+      "quantile_guard_band_error": "Het RTE-percentage moet een technische veiligheidsmarge zijn tussen de opslag- en verbruikpercentages."
     },
     "step": {
       "user": {
@@ -18,8 +18,8 @@
           "forecast_entity": "Prijssensor entiteit ID",
           "solar_bonus_percent": "Percentage zonnebonus",
           "solar_bonus_fixed_c_kwh": "Vaste zonnebonus (cent/kWh)",
-          "charge_multiplier_quantile": "Laad (opslag) multiplier kwantiel",
-          "discharge_multiplier_quantile": "Ontlaad (verbruik) multiplier kwantiel"
+          "charge_multiplier_quantile": "Opslaan multiplier kwantiel",
+          "discharge_multiplier_quantile": "Verbruik multiplier kwantiel"
         },
         "description": "Voer de configuratiewaarden voor de sensor in."
       },
@@ -35,8 +35,8 @@
           "forecast_entity": "Prijssensor entiteit ID",
           "solar_bonus_percent": "Percentage zonnebonus",
           "solar_bonus_fixed_c_kwh": "Vaste zonnebonus (cent/kWh)",
-          "charge_multiplier_quantile": "Laad (opslag) multiplier kwantiel",
-          "discharge_multiplier_quantile": "Ontlaad (verbruik) multiplier kwantiel"
+          "charge_multiplier_quantile": "Opslaan multiplier kwantiel",
+          "discharge_multiplier_quantile": "Verbruik multiplier kwantiel"
         },
         "description": "Pas de configuratiewaarden voor de sensor aan."
       }

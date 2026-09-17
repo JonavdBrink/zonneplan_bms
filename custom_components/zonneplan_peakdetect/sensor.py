@@ -13,8 +13,8 @@ from homeassistant.helpers.sun import get_astral_event_date
 from homeassistant.util import dt as dt_util
 
 from .const import (
-    ACTION_CHARGE,
-    ACTION_DISCHARGE,
+    ACTION_SAVE,
+    ACTION_CONSUME,
     ACTION_BUY,
     ACTION_SELL,
     ACTION_STOP,
@@ -462,9 +462,9 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                     )
                     mult = item.get('price_multiplier', 1.0)
                     if sun_above_horizon and charge_threshold is not None and mult < charge_threshold:
-                        item['action'] = ACTION_CHARGE
+                        item['action'] = ACTION_SAVE
                     elif discharge_threshold is not None and mult >= discharge_threshold:
-                        item['action'] = ACTION_DISCHARGE
+                        item['action'] = ACTION_CONSUME
 
         # Read total active interval count directly from scheduled data attributes
         intervals = len(set(h['interval_id'] for h in schedule if h.get('interval_id', -1) >= 0 and h.get('action') in (ACTION_BUY, ACTION_SELL)))

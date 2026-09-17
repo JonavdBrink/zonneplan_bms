@@ -10,8 +10,10 @@ from custom_components.zonneplan_peakdetect.const import (
     ALGORITHM_MPES,
     MULTIPLIER_CPWL,
     MULTIPLIER_BLOCK,
-    ACTION_CHARGE,
-    ACTION_DISCHARGE,
+    ACTION_SAVE,
+    ACTION_CONSUME,
+    ACTION_BUY,
+    ACTION_SELL,
     ACTION_STOP,
 )
 
@@ -665,9 +667,9 @@ def main():
             last_interval_id = iid
 
         action = item["action"]
-        if action == ACTION_CHARGE:
+        if action in (ACTION_BUY, ACTION_SAVE):
             action_str = f"\033[92m{action:<10}\033[0m"  # Green
-        elif action =="ACTION_DISCHARGE" or action == ACTION_DISCHARGE:
+        elif action in (ACTION_SELL, ACTION_CONSUME):
             action_str = f"\033[91m{action:<10}\033[0m"  # Red
         else:
             action_str = f"{action:<10}"
