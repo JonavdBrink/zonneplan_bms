@@ -52,3 +52,10 @@ def september8_forecast():
     """Returns the parsed September 8 forecast list."""
     raw_data = load_fixture_file("september8_data.yaml")
     return get_forecast_list(raw_data)
+
+@pytest.fixture
+def september20_forecast():
+    """Returns the parsed September 20 forecast list."""
+    raw_data = load_fixture_file("september20_data.yaml")
+    return get_forecast_list(raw_data)
+

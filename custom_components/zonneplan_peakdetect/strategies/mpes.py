@@ -32,18 +32,27 @@ class MpesStrategy(ArbitrageStrategy):
         sell_prices = [item.get('sell_price_eur_kwh', item['price_eur_kwh']) for item in prepared_data]
 
         # 1. Schmitt-Trigger Swing Filter to find major valleys and peaks
-        swings = self._find_major_swings(sell_prices, min_profit_eur_kwh)
+        # We run this on buy_prices (base prices) so the solar bonus (which only applies to selling)
+        # does not artificially flatten the daytime dip and obscure the true afternoon buying valley.
+        swings = self._find_major_swings(buy_prices, min_profit_eur_kwh)
 
         # 2. Pair alternating valleys and peaks into distinct cycles
-        cycles = []
+        all_cycles = []
         for i in range(len(swings) - 1):
             if swings[i]['type'] == 'valley' and swings[i+1]['type'] == 'peak':
-                cycles.append({
+                all_cycles.append({
                     'valley_idx': swings[i]['idx'],
                     'valley_price': buy_prices[swings[i]['idx']],
                     'peak_idx': swings[i+1]['idx'],
                     'peak_price': sell_prices[swings[i+1]['idx']]
                 })
+
+        # Pre-filter cycles to only keep profitable ones. This prevents unprofitable minor
+        # cycles from artificially truncating search boundaries of neighboring cycles.
+        cycles = [
+            c for c in all_cycles
+            if c['peak_price'] * rte_factor - c['valley_price'] >= min_profit_eur_kwh
+        ]
 
         # 3. Schedule slot allocation per cycle
         interval_count = 0
@@ -58,8 +67,8 @@ class MpesStrategy(ArbitrageStrategy):
             midpoint = (v_idx + p_idx) // 2
 
             # Define search range bounds to prevent overlap with adjacent cycles
-            start_search = 0 if cycle_id == 0 else (cycles[cycle_id-1]['peak_idx'] + v_idx) // 2
-            end_search = n if cycle_id == len(cycles) - 1 else (p_idx + cycles[cycle_id+1]['valley_idx']) // 2
+            start_search = 0 if cycle_id == 0 else cycles[cycle_id-1]['peak_idx']
+            end_search = n if cycle_id == len(cycles) - 1 else cycles[cycle_id+1]['valley_idx']
 
             # Separate into charge pool (before midpoint) and discharge pool (after midpoint)
             charge_segment_indices = list(range(start_search, midpoint))

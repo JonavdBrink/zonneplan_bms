@@ -18,6 +18,7 @@
           "forecast_entity": "Prijssensor entiteit ID",
           "solar_bonus_percent": "Percentage zonnebonus",
           "solar_bonus_fixed_c_kwh": "Vaste zonnebonus (cent/kWh)",
+          "solar_bonus_in_arbitrage": "Gebruik zonnebonusvoordeel bij de planning van arbitragecycli",
           "charge_multiplier_quantile": "Opslaan multiplier kwantiel",
           "discharge_multiplier_quantile": "Verbruik multiplier kwantiel"
         },
@@ -35,6 +36,7 @@
           "forecast_entity": "Prijssensor entiteit ID",
           "solar_bonus_percent": "Percentage zonnebonus",
           "solar_bonus_fixed_c_kwh": "Vaste zonnebonus (cent/kWh)",
+          "solar_bonus_in_arbitrage": "Gebruik zonnebonusvoordeel bij de planning van arbitragecycli",
           "charge_multiplier_quantile": "Opslaan multiplier kwantiel",
           "discharge_multiplier_quantile": "Verbruik multiplier kwantiel"
         },

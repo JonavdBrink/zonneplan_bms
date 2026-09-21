@@ -31,8 +31,10 @@ from .const import (
     DEFAULT_MULTIPLIER_ALGORITHM,
     CONF_SOLAR_BONUS_PERCENT,
     CONF_SOLAR_BONUS_FIXED_C_KWH,
+    CONF_SOLAR_BONUS_IN_ARBITRAGE,
     DEFAULT_SOLAR_BONUS_PERCENT,
     DEFAULT_SOLAR_BONUS_FIXED_C_KWH,
+    DEFAULT_SOLAR_BONUS_IN_ARBITRAGE,
     CONF_CHARGE_QUANTILE,
     CONF_DISCHARGE_QUANTILE,
     DEFAULT_CHARGE_QUANTILE,
@@ -112,6 +114,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 CONF_DISCHARGE_QUANTILE,
                 default=user_input.get(CONF_DISCHARGE_QUANTILE, DEFAULT_DISCHARGE_QUANTILE)
             ): vol.All(vol.Coerce(float), vol.Range(min=0.0, max=100.0)),
+            vol.Required(
+                CONF_SOLAR_BONUS_IN_ARBITRAGE,
+                default=user_input.get(CONF_SOLAR_BONUS_IN_ARBITRAGE, DEFAULT_SOLAR_BONUS_IN_ARBITRAGE)
+            ): bool,
         })
 
     async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:

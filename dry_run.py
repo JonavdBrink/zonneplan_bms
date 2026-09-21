@@ -95,7 +95,10 @@ def calculate_action_schedule(
     algorithm_type="whss",
     multiplier_type="block",
     solar_bonus_percent=10.0,
-    solar_bonus_fixed_c_kwh=2.0
+    solar_bonus_fixed_c_kwh=2.0,
+    charge_multiplier_quantile=50.0,
+    discharge_multiplier_quantile=75.0,
+    solar_bonus_in_arbitrage=True
 ):
     """Polymorphically runs the chosen BESS Arbitrage strategy and post-processes multipliers."""
     if not forecast_data:
@@ -149,10 +152,14 @@ def calculate_action_schedule(
             and _solar_bonus_applies(dt, solar_bonus_windows)
         )
         effective_price = price
-        if solar_bonus_applied:
+        if solar_bonus_applied and solar_bonus_in_arbitrage:
             effective_price = (
                 price + solar_bonus_fixed_eur_kwh
             ) * (1.0 + solar_bonus_percent / 100.0)
+
+        actual_effective_price = (
+            price + solar_bonus_fixed_eur_kwh
+        ) * (1.0 + solar_bonus_percent / 100.0) if solar_bonus_applied else price
 
         prepared_data.append({
             'datetime': raw_dt,
@@ -162,7 +169,7 @@ def calculate_action_schedule(
             'forecast_price_eur_kwh': price,
             'solar_bonus_applied': solar_bonus_applied,
             'solar_bonus_multiplier': round(
-                effective_price / price, 4
+                actual_effective_price / price, 4
             ) if price != 0 else 1.0,
             'price_multiplier': 1.0,
             'action': ACTION_STOP,
@@ -191,7 +198,7 @@ def calculate_action_schedule(
         valleys = {}
         for idx, item in enumerate(prepared_data):
             iid = item.get('interval_id', -1)
-            if item.get('action') != ACTION_STOP:
+            if item.get('action') in (ACTION_BUY, ACTION_SELL):
                 if iid >= 0:
                     price = item.get('buy_price_eur_kwh', item['price_eur_kwh'])
                     if iid not in valleys or price < valleys[iid]['price']:
@@ -207,24 +214,24 @@ def calculate_action_schedule(
                 item['price_multiplier'] = round(p / global_min, 2) if global_min > 0 else round(1.0 + p / abs(global_min), 2) if global_min != 0 else 1.0
                 item['interval_id'] = -1
         else:
-            # Reassign close midpoints
-            if len(active_wave_ids) == 1:
-                single_id = active_wave_ids[0]
-                for item in prepared_data:
-                    item['interval_id'] = single_id
-            else:
-                midpoints = []
-                for k in range(len(active_wave_ids) - 1):
-                    idx_a = valleys[active_wave_ids[k]]['idx']
-                    idx_b = valleys[active_wave_ids[k+1]]['idx']
-                    midpoints.append((idx_a + idx_b) // 2)
-
-                for idx, item in enumerate(prepared_data):
-                    assigned_id = active_wave_ids[0]
-                    for k, mid in enumerate(midpoints):
-                        if idx > mid:
-                            assigned_id = active_wave_ids[k+1]
-                    item['interval_id'] = assigned_id
+            # Reassign based on the closest active slot partition (protecting actual Buy/Sell)
+            active_slots = [
+                (idx, item['interval_id'])
+                for idx, item in enumerate(prepared_data)
+                if item.get('action') in (ACTION_BUY, ACTION_SELL)
+            ]
+            
+            for idx, item in enumerate(prepared_data):
+                if item.get('action') not in (ACTION_BUY, ACTION_SELL):
+                    # Find the active slot with the minimum absolute distance
+                    closest_iid = active_wave_ids[0]
+                    min_dist = n
+                    for active_idx, active_iid in active_slots:
+                        dist = abs(idx - active_idx)
+                        if dist < min_dist:
+                            min_dist = dist
+                            closest_iid = active_iid
+                    item['interval_id'] = closest_iid
 
             # Calculate divisor for each interval in the timeline
             if multiplier_type == MULTIPLIER_BLOCK:
@@ -296,12 +303,50 @@ def calculate_action_schedule(
             except Exception:
                 pass
 
-    interval_count = len(set(item['interval_id'] for item in prepared_data if item.get('interval_id', -1) >= 0 and item.get('action') != ACTION_STOP))
+        # Apply Charge/Discharge (Save/Consume) logic based on multiplier quantiles
+        if len(prepared_data) > 0:
+            multipliers = [item.get('price_multiplier', 1.0) for item in prepared_data]
+            
+            def _get_quantile_value(multipliers, pct):
+                if not multipliers:
+                    return None
+                sorted_multipliers = sorted(multipliers)
+                n = len(sorted_multipliers)
+                if n == 1:
+                    return sorted_multipliers[0]
+                idx = (pct / 100.0) * (n - 1)
+                low = int(idx)
+                high = min(n - 1, low + 1)
+                weight = idx - low
+                return round((1.0 - weight) * sorted_multipliers[low] + weight * sorted_multipliers[high], 2)
+
+            charge_threshold = _get_quantile_value(multipliers, charge_multiplier_quantile)
+            discharge_threshold = _get_quantile_value(multipliers, discharge_multiplier_quantile)
+
+            for item in prepared_data:
+                if item.get('action') == ACTION_STOP:
+                    dt = _parse_datetime(item.get('datetime'))
+                    sun_above_horizon = bool(
+                        dt and _solar_bonus_applies(dt, solar_bonus_windows)
+                    )
+                    mult = item.get('price_multiplier', 1.0)
+                    if sun_above_horizon and charge_threshold is not None and mult < charge_threshold:
+                        item['action'] = ACTION_SAVE
+                    elif discharge_threshold is not None and mult >= discharge_threshold:
+                        item['action'] = ACTION_CONSUME
+
+    interval_count = len(set(item['interval_id'] for item in prepared_data if item.get('interval_id', -1) >= 0 and item.get('action') in (ACTION_BUY, ACTION_SELL)))
 
     # Format output keys
     formatted_data = []
     for item in prepared_data:
-        bonus_amount = round(item['sell_price_eur_kwh'] - item['price_eur_kwh'], 7) if item.get('solar_bonus_applied') else 0.0
+        actual_sell_price = item['sell_price_eur_kwh']
+        if not solar_bonus_in_arbitrage and item.get('solar_bonus_applied'):
+            actual_sell_price = (
+                item['price_eur_kwh'] + solar_bonus_fixed_eur_kwh
+            ) * (1.0 + solar_bonus_percent / 100.0)
+        
+        bonus_amount = round(actual_sell_price - item['price_eur_kwh'], 7) if item.get('solar_bonus_applied') else 0.0
         formatted_item = {
             'datetime': item['datetime'],
             'price_eur_kwh': item['price_eur_kwh'],
@@ -529,6 +574,16 @@ forecast_data = [
 ]
 
 def main():
+    import argparse
+
+    parser = argparse.ArgumentParser(description="BESS Arbitrage Scheduler - Dry Run Tool")
+    parser.add_argument("-f", "--fixture", help="Path to the forecast JSON/YAML fixture file")
+    parser.add_argument("-a", "--algorithm", choices=[ALGORITHM_WHSS, ALGORITHM_HSWAS, ALGORITHM_MPES], default=ALGORITHM_WHSS, help="BESS Arbitrage algorithm strategy to run")
+    parser.add_argument("-m", "--multiplier-algorithm", choices=[MULTIPLIER_CPWL, MULTIPLIER_BLOCK], default=MULTIPLIER_BLOCK, help="Multiplier baseline calculation algorithm")
+    parser.add_argument("-d", "--disable-solar-bonus-in-arbitrage", dest="solar_bonus_in_arbitrage", action="store_false", help="Disable using the solar bonus advantage during arbitrage cycle planning")
+    
+    args = parser.parse_args()
+
     data = forecast_data
     charge_quarters = 13
     discharge_quarters = 11
@@ -536,17 +591,12 @@ def main():
     price_delta_percent = 20.0
     solar_bonus_percent = 10.0
     solar_bonus_fixed_c_kwh = 2.0
-    algorithm_type = ALGORITHM_WHSS
-    multiplier_type = MULTIPLIER_BLOCK
-
-    filepath = None
-    for arg in sys.argv[1:]:
-        if arg in (ALGORITHM_WHSS, ALGORITHM_HSWAS, ALGORITHM_MPES):
-            algorithm_type = arg
-        elif arg in (MULTIPLIER_CPWL, MULTIPLIER_BLOCK):
-            multiplier_type = arg
-        else:
-            filepath = arg
+    solar_bonus_in_arbitrage = args.solar_bonus_in_arbitrage
+    charge_multiplier_quantile = 50.0
+    discharge_multiplier_quantile = 75.0
+    algorithm_type = args.algorithm
+    multiplier_type = args.multiplier_algorithm
+    filepath = args.fixture
 
     if filepath is not None:
         try:
@@ -587,6 +637,12 @@ def main():
                         solar_bonus_percent = attrs['solar_bonus_percent']
                     if 'solar_bonus_fixed_c_kwh' in attrs:
                         solar_bonus_fixed_c_kwh = attrs['solar_bonus_fixed_c_kwh']
+                    if 'solar_bonus_in_arbitrage' in attrs:
+                        solar_bonus_in_arbitrage = attrs['solar_bonus_in_arbitrage']
+                    if 'charge_multiplier_quantile' in attrs:
+                        charge_multiplier_quantile = attrs['charge_multiplier_quantile']
+                    if 'discharge_multiplier_quantile' in attrs:
+                        discharge_multiplier_quantile = attrs['discharge_multiplier_quantile']
                 elif 'schedule' in parsed:
                     parsed = parsed['schedule']
                 elif 'forecast' in parsed:
@@ -614,10 +670,13 @@ def main():
         algorithm_type=algorithm_type,
         multiplier_type=multiplier_type,
         solar_bonus_percent=solar_bonus_percent,
-        solar_bonus_fixed_c_kwh=solar_bonus_fixed_c_kwh
+        solar_bonus_fixed_c_kwh=solar_bonus_fixed_c_kwh,
+        charge_multiplier_quantile=charge_multiplier_quantile,
+        discharge_multiplier_quantile=discharge_multiplier_quantile,
+        solar_bonus_in_arbitrage=solar_bonus_in_arbitrage
     )
     
-    active_intervals = len(set(item['interval_id'] for item in schedule if item.get('interval_id', -1) >= 0 and item.get('action') != ACTION_STOP))
+    active_intervals = len(set(item['interval_id'] for item in schedule if item.get('interval_id', -1) >= 0 and item.get('action') in (ACTION_BUY, ACTION_SELL)))
 
     # Calculate quantiles fixed per interval_id
     from collections import defaultdict

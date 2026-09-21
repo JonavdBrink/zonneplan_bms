@@ -27,6 +27,7 @@ from .const import (
     CONF_MULTIPLIER_ALGORITHM,
     CONF_SOLAR_BONUS_PERCENT,
     CONF_SOLAR_BONUS_FIXED_C_KWH,
+    CONF_SOLAR_BONUS_IN_ARBITRAGE,
     CONF_CHARGE_QUANTILE,
     CONF_DISCHARGE_QUANTILE,
     DEFAULT_ALGORITHM,
@@ -35,6 +36,7 @@ from .const import (
     DEFAULT_PERCENTAGE,
     DEFAULT_SOLAR_BONUS_PERCENT,
     DEFAULT_SOLAR_BONUS_FIXED_C_KWH,
+    DEFAULT_SOLAR_BONUS_IN_ARBITRAGE,
     DEFAULT_CHARGE_QUANTILE,
     DEFAULT_DISCHARGE_QUANTILE,
     MULTIPLIER_CPWL,
@@ -85,6 +87,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: Any, async_add_en
     )
     charge_multiplier_quantile = config.get(CONF_CHARGE_QUANTILE, DEFAULT_CHARGE_QUANTILE)
     discharge_multiplier_quantile = config.get(CONF_DISCHARGE_QUANTILE, DEFAULT_DISCHARGE_QUANTILE)
+    solar_bonus_in_arbitrage = config.get(CONF_SOLAR_BONUS_IN_ARBITRAGE, DEFAULT_SOLAR_BONUS_IN_ARBITRAGE)
 
     async_add_entities([
         BatteryOptimizerSensor(
@@ -100,6 +103,7 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: Any, async_add_en
             solar_bonus_fixed_c_kwh,
             charge_multiplier_quantile,
             discharge_multiplier_quantile,
+            solar_bonus_in_arbitrage,
             SENSOR_DESCRIPTION
         )
     ], True)
@@ -133,6 +137,7 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         solar_bonus_fixed_c_kwh: float,
         charge_multiplier_quantile: float,
         discharge_multiplier_quantile: float,
+        solar_bonus_in_arbitrage: bool,
         description: SensorEntityDescription
     ) -> None:
         """Initialize the sensor."""
@@ -147,6 +152,7 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         self._multiplier_type = multiplier_type
         self._solar_bonus_percent = solar_bonus_percent
         self._solar_bonus_fixed_eur_kwh = solar_bonus_fixed_c_kwh / 100.0
+        self._solar_bonus_in_arbitrage = solar_bonus_in_arbitrage
         self._charge_multiplier_quantile = charge_multiplier_quantile
         self._discharge_multiplier_quantile = discharge_multiplier_quantile
         # Convert minimal profit from cents/kWh to €/kWh
@@ -163,6 +169,7 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
             "multiplier_type": self._multiplier_type,
             "solar_bonus_percent": self._solar_bonus_percent,
             "solar_bonus_fixed_c_kwh": solar_bonus_fixed_c_kwh,
+            "solar_bonus_in_arbitrage": self._solar_bonus_in_arbitrage,
             "charge_multiplier_quantile": self._charge_multiplier_quantile,
             "discharge_multiplier_quantile": self._discharge_multiplier_quantile,
             "current_price_multiplier": 1.0,
@@ -301,10 +308,14 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                 and self._solar_bonus_applies(dt, solar_bonus_windows)
             )
             effective_price = price
-            if solar_bonus_applied:
+            if solar_bonus_applied and self._solar_bonus_in_arbitrage:
                 effective_price = (
                     price + self._solar_bonus_fixed_eur_kwh
                 ) * (1.0 + self._solar_bonus_percent / 100.0)
+
+            actual_effective_price = (
+                price + self._solar_bonus_fixed_eur_kwh
+            ) * (1.0 + self._solar_bonus_percent / 100.0) if solar_bonus_applied else price
 
             prepared_data.append({
                 'datetime': raw_dt,
@@ -314,7 +325,7 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                 'forecast_price_eur_kwh': price,
                 'solar_bonus_applied': solar_bonus_applied,
                 'solar_bonus_multiplier': round(
-                    effective_price / price, 4
+                    actual_effective_price / price, 4
                 ) if price != 0 else 1.0,
                 'price_multiplier': 1.0,
                 'action': ACTION_STOP,
@@ -360,7 +371,7 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
             valleys = {}
             for idx, item in enumerate(schedule):
                 iid = item.get('interval_id', -1)
-                if item.get('action') != ACTION_STOP:
+                if item.get('action') in (ACTION_BUY, ACTION_SELL):
                     if iid >= 0:
                         price = item.get('buy_price_eur_kwh', item['price_eur_kwh'])
                         if iid not in valleys or price < valleys[iid]['price']:
@@ -377,25 +388,24 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                     item['price_multiplier'] = round(p / global_min, 2) if global_min > 0 else round(1.0 + p / abs(global_min), 2) if global_min != 0 else 1.0
                     item['interval_id'] = -1
             else:
-                # 2. Assign interval_id to all items based on closest wave's midpoint partition
-                if len(active_wave_ids) == 1:
-                    single_id = active_wave_ids[0]
-                    for item in schedule:
-                        item['interval_id'] = single_id
-                else:
-                    midpoints = []
-                    for k in range(len(active_wave_ids) - 1):
-                        idx_a = valleys[active_wave_ids[k]]['idx']
-                        idx_b = valleys[active_wave_ids[k+1]]['idx']
-                        midpoints.append((idx_a + idx_b) // 2)
-                    
-                    for idx, item in enumerate(schedule):
-                        assigned_id = active_wave_ids[-1]
-                        for k in range(len(midpoints)):
-                            if idx <= midpoints[k]:
-                                assigned_id = active_wave_ids[k]
-                                break
-                        item['interval_id'] = assigned_id
+                # 2. Assign interval_id to passive items based on the closest active slot (protecting actual Buy/Sell)
+                active_slots = [
+                    (idx, item['interval_id'])
+                    for idx, item in enumerate(schedule)
+                    if item.get('action') in (ACTION_BUY, ACTION_SELL)
+                ]
+                
+                for idx, item in enumerate(schedule):
+                    if item.get('action') not in (ACTION_BUY, ACTION_SELL):
+                        # Find the active slot with the minimum absolute distance
+                        closest_iid = active_wave_ids[0]
+                        min_dist = n
+                        for active_idx, active_iid in active_slots:
+                            dist = abs(idx - active_idx)
+                            if dist < min_dist:
+                                min_dist = dist
+                                closest_iid = active_iid
+                        item['interval_id'] = closest_iid
 
                 # 3. Calculate divisor for each interval in the timeline
                 if self._multiplier_type == MULTIPLIER_BLOCK:
@@ -473,7 +483,13 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         # Format output keys for Home Assistant attributes
         formatted_schedule = []
         for item in schedule:
-            bonus_amount = round(item['sell_price_eur_kwh'] - item['price_eur_kwh'], 7) if item.get('solar_bonus_applied') else 0.0
+            actual_sell_price = item['sell_price_eur_kwh']
+            if not self._solar_bonus_in_arbitrage and item.get('solar_bonus_applied'):
+                actual_sell_price = (
+                    item['price_eur_kwh'] + self._solar_bonus_fixed_eur_kwh
+                ) * (1.0 + self._solar_bonus_percent / 100.0)
+            
+            bonus_amount = round(actual_sell_price - item['price_eur_kwh'], 7) if item.get('solar_bonus_applied') else 0.0
             formatted_schedule.append({
                 'datetime': item['datetime'],
                 'price_eur_kwh': item['price_eur_kwh'],
