@@ -310,3 +310,35 @@ def test_hswas_uses_buy_price_for_charging_and_sell_price_for_discharging():
 
     assert result[1]["action"] == ACTION_BUY
     assert result[2]["action"] == ACTION_SELL
+
+
+def test_hswas_uses_independent_charge_and_discharge_slot_counts():
+    """The configured slot counts are honored even when individual slots vary in profitability."""
+    prepared_data = [
+        {
+            "datetime": f"2026-08-12T{hour:02d}:00:00+00:00",
+            "price_eur_kwh": price,
+            "buy_price_eur_kwh": price,
+            "sell_price_eur_kwh": price,
+            "sort_index": index,
+            "action": "Stop",
+            "interval_id": -1,
+        }
+        for index, (hour, price) in enumerate([
+            (0, 0.10),
+            (1, 0.38),
+            (2, 0.40),
+        ])
+    ]
+
+    result = HswasStrategy().calculate_schedule(
+        prepared_data,
+        charge_slots_count=2,
+        discharge_slots_count=1,
+        rte_factor=1.0,
+        min_profit_eur_kwh=0.10,
+        now=datetime.now(timezone.utc),
+    )
+
+    assert sum(item["action"] == ACTION_BUY for item in result) == 2
+    assert sum(item["action"] == ACTION_SELL for item in result) == 1

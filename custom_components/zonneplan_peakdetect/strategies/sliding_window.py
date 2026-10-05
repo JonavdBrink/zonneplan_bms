@@ -62,17 +62,15 @@ class HswasStrategy(ArbitrageStrategy):
                     segment_end = best_discharge_idx + discharge_slots_count
                     
                     segment = prepared_data[segment_start : segment_end]
-                    local_valley_val = min(h.get('buy_price_eur_kwh', h['price_eur_kwh']) for h in segment)
-                    local_peak_val = max(h.get('sell_price_eur_kwh', h['price_eur_kwh']) for h in segment)
                     
                     charge_pool = prepared_data[segment_start : best_discharge_idx]
                     discharge_pool = prepared_data[best_discharge_idx : segment_end]
                     
-                    charge_cands = [h for h in charge_pool if local_peak_val * rte_factor - h.get('buy_price_eur_kwh', h['price_eur_kwh']) >= min_profit_eur_kwh]
+                    charge_cands = list(charge_pool)
                     charge_cands.sort(key=lambda x: x.get('buy_price_eur_kwh', x['price_eur_kwh']))
                     charge_slots = charge_cands[:charge_slots_count]
                     
-                    discharge_cands = [h for h in discharge_pool if h.get('sell_price_eur_kwh', h['price_eur_kwh']) * rte_factor - local_valley_val >= min_profit_eur_kwh]
+                    discharge_cands = list(discharge_pool)
                     discharge_cands.sort(key=lambda x: x.get('sell_price_eur_kwh', x['price_eur_kwh']), reverse=True)
                     discharge_slots = discharge_cands[:discharge_slots_count]
                     
