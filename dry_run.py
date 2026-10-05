@@ -98,7 +98,9 @@ def calculate_action_schedule(
     solar_bonus_fixed_c_kwh=2.0,
     charge_multiplier_quantile=50.0,
     discharge_multiplier_quantile=75.0,
-    solar_bonus_in_arbitrage=True
+    solar_bonus_in_arbitrage=True,
+    consume_quarters=8,
+    save_quarters=0
 ):
     """Polymorphically runs the chosen BESS Arbitrage strategy and post-processes multipliers."""
     if not forecast_data:
@@ -140,8 +142,20 @@ def calculate_action_schedule(
             price = raw_price / 10_000_000.0
         else:
             continue
+
+        ex_tax_price = None
+        price_tax_excluded = item.get('price_tax_excluded')
+        if isinstance(price_tax_excluded, dict):
+            ex_tax_raw = price_tax_excluded.get('amount')
+            if ex_tax_raw is not None:
+                ex_tax_price = ex_tax_raw / 10_000_000.0
+        elif price_tax_excluded is not None:
+            ex_tax_price = float(price_tax_excluded)
+        elif 'price_tax_excluded_eur_kwh' in item:
+            ex_tax_price = float(item['price_tax_excluded_eur_kwh'])
             
         dt = _parse_datetime(raw_dt)
+        base_ex_tax = ex_tax_price if ex_tax_price is not None else price
 
         solar_bonus_applied = bool(
             dt
@@ -150,20 +164,27 @@ def calculate_action_schedule(
                 or solar_bonus_fixed_eur_kwh > 0
             )
             and _solar_bonus_applies(dt, solar_bonus_windows)
+            and (base_ex_tax + solar_bonus_fixed_eur_kwh > 0)
         )
+
+        bonus_amount = 0.0
+        if solar_bonus_applied:
+            bonus_amount = round(
+                (base_ex_tax + solar_bonus_fixed_eur_kwh) * (1.0 + solar_bonus_percent / 100.0) - base_ex_tax,
+                7
+            )
+
         effective_price = price
         if solar_bonus_applied and solar_bonus_in_arbitrage:
-            effective_price = (
-                price + solar_bonus_fixed_eur_kwh
-            ) * (1.0 + solar_bonus_percent / 100.0)
+            effective_price = price + bonus_amount
 
-        actual_effective_price = (
-            price + solar_bonus_fixed_eur_kwh
-        ) * (1.0 + solar_bonus_percent / 100.0) if solar_bonus_applied else price
+        actual_effective_price = price + bonus_amount if solar_bonus_applied else price
 
         prepared_data.append({
             'datetime': raw_dt,
             'price_eur_kwh': price,
+            'price_tax_excluded': ex_tax_price,
+            'price_bonus_eur_kwh': bonus_amount,
             'buy_price_eur_kwh': price,
             'sell_price_eur_kwh': effective_price,
             'forecast_price_eur_kwh': price,
@@ -196,13 +217,17 @@ def calculate_action_schedule(
     n = len(prepared_data)
     if n > 0:
         valleys = {}
+        peaks = {}
         for idx, item in enumerate(prepared_data):
             iid = item.get('interval_id', -1)
             if item.get('action') in (ACTION_BUY, ACTION_SELL):
                 if iid >= 0:
-                    price = item.get('buy_price_eur_kwh', item['price_eur_kwh'])
-                    if iid not in valleys or price < valleys[iid]['price']:
-                        valleys[iid] = {'idx': idx, 'price': price}
+                    buy_price = item.get('buy_price_eur_kwh', item['price_eur_kwh'])
+                    if iid not in valleys or buy_price < valleys[iid]['price']:
+                        valleys[iid] = {'idx': idx, 'price': buy_price}
+                    sell_price = item.get('sell_price_eur_kwh', item['price_eur_kwh'])
+                    if iid not in peaks or sell_price > peaks[iid]['price']:
+                        peaks[iid] = {'idx': idx, 'price': sell_price}
 
         active_wave_ids = sorted(valleys.keys())
 
@@ -235,33 +260,39 @@ def calculate_action_schedule(
 
             # Calculate divisor for each interval in the timeline
             if multiplier_type == MULTIPLIER_BLOCK:
-                # Partition into windows anchored at the end of each active wave segment
+                # Partition into windows spanning between adjacent active wave segments
                 windows = []
                 prev_end = 0
-                for iid in active_wave_ids:
-                    active_indices = [idx for idx, item in enumerate(prepared_data) if item.get('interval_id', -1) == iid and item.get('action') != ACTION_STOP]
-                    end_idx = (max(active_indices) + 1) if active_indices else n
+                for k in range(len(active_wave_ids)):
+                    iid = active_wave_ids[k]
+                    if k == len(active_wave_ids) - 1:
+                        end_idx = n
+                    else:
+                        next_iid = active_wave_ids[k + 1]
+                        curr_active = [idx for idx, item in enumerate(prepared_data) if item.get('interval_id', -1) == iid and item.get('action') in (ACTION_BUY, ACTION_SELL)]
+                        next_active = [idx for idx, item in enumerate(prepared_data) if item.get('interval_id', -1) == next_iid and item.get('action') in (ACTION_BUY, ACTION_SELL)]
+                        if curr_active and next_active:
+                            end_idx = (max(curr_active) + min(next_active)) // 2
+                        elif curr_active:
+                            end_idx = max(curr_active) + 1
+                        else:
+                            end_idx = n
                     windows.append((prev_end, end_idx))
                     prev_end = end_idx
-                
-                if windows:
-                    # Extend the last window to cover the trailing part of the day
-                    last_start, _ = windows[-1]
-                    windows[-1] = (last_start, n)
 
-                # For each window, find its minimum price and calculate multipliers
+                # For each window, find its minimum price and calculate multipliers using import price
                 for start, end in windows:
                     window_slice = prepared_data[start:end]
                     if window_slice:
                         window_min = min(item.get('buy_price_eur_kwh', item['price_eur_kwh']) for item in window_slice)
                         for item in window_slice:
-                            p = item.get('sell_price_eur_kwh', item['price_eur_kwh'])
+                            p = item.get('buy_price_eur_kwh', item['price_eur_kwh'])
                             item['price_multiplier'] = round(p / window_min, 2) if window_min > 0 else round(1.0 + p / abs(window_min), 2) if window_min != 0 else 1.0
             else: # MULTIPLIER_CPWL
                 anchors = [(valleys[iid]['idx'], valleys[iid]['price']) for iid in active_wave_ids]
                 
                 for idx, item in enumerate(prepared_data):
-                    p = item.get('sell_price_eur_kwh', item['price_eur_kwh'])
+                    p = item.get('buy_price_eur_kwh', item['price_eur_kwh'])
                     
                     # If before the first valley, lock to first valley price
                     if idx <= anchors[0][0]:
@@ -322,7 +353,11 @@ def calculate_action_schedule(
 
             charge_threshold = _get_quantile_value(multipliers, charge_multiplier_quantile)
             discharge_threshold = _get_quantile_value(multipliers, discharge_multiplier_quantile)
+            global_min = min(item.get('buy_price_eur_kwh', item['price_eur_kwh']) for item in prepared_data)
+            global_max = max(item.get('sell_price_eur_kwh', item['price_eur_kwh']) for item in prepared_data)
 
+            # 1. Identify Save slots (solar saving into battery)
+            save_candidates = []
             for item in prepared_data:
                 if item.get('action') == ACTION_STOP:
                     dt = _parse_datetime(item.get('datetime'))
@@ -330,10 +365,62 @@ def calculate_action_schedule(
                         dt and _solar_bonus_applies(dt, solar_bonus_windows)
                     )
                     mult = item.get('price_multiplier', 1.0)
-                    if sun_above_horizon and charge_threshold is not None and mult < charge_threshold:
-                        item['action'] = ACTION_SAVE
-                    elif discharge_threshold is not None and mult >= discharge_threshold:
-                        item['action'] = ACTION_CONSUME
+                    iid = item.get('interval_id', -1)
+                    peak_price = peaks[iid]['price'] if (iid >= 0 and iid in peaks) else global_max
+                    sell_p = item.get('sell_price_eur_kwh', item['price_eur_kwh'])
+
+                    can_save = (
+                        sun_above_horizon
+                        and charge_threshold is not None
+                        and mult <= charge_threshold
+                        and (peak_price * rte_factor - sell_p >= min_profit_eur_kwh)
+                    )
+                    if can_save:
+                        save_candidates.append(item)
+
+            if save_quarters > 0 and len(save_candidates) > save_quarters:
+                save_candidates.sort(
+                    key=lambda x: (
+                        x.get('sell_price_eur_kwh', x['price_eur_kwh']),
+                        x.get('price_multiplier', 1.0)
+                    )
+                )
+                save_candidates = save_candidates[:save_quarters]
+
+            for item in save_candidates:
+                item['action'] = ACTION_SAVE
+
+            # 2. Identify and rank Consume candidates (avoiding expensive grid import)
+            consume_candidates = []
+            for idx, item in enumerate(prepared_data):
+                if item.get('action') == ACTION_STOP:
+                    mult = item.get('price_multiplier', 1.0)
+                    iid = item.get('interval_id', -1)
+                    valley_price = valleys[iid]['price'] if (iid >= 0 and iid in valleys) else global_min
+                    buy_p = item.get('buy_price_eur_kwh', item['price_eur_kwh'])
+
+                    can_consume = (
+                        discharge_threshold is not None
+                        and mult >= discharge_threshold
+                        and mult >= 1.30  # Absolute floor: avoid cycling on low-spread flat days
+                        and (buy_p * rte_factor - valley_price >= min_profit_eur_kwh)
+                    )
+                    if can_consume:
+                        consume_candidates.append(idx)
+
+            # Sort Consume candidates by price descending to discharge during highest peaks first
+            consume_candidates.sort(
+                key=lambda i: (
+                    prepared_data[i].get('buy_price_eur_kwh', prepared_data[i]['price_eur_kwh']),
+                    prepared_data[i].get('price_multiplier', 1.0)
+                ),
+                reverse=True
+            )
+
+            # Capacity-aware allocation: discharge during top-impact hours
+            max_consume_quarters = consume_quarters if consume_quarters > 0 else len(consume_candidates)
+            for idx in consume_candidates[:max_consume_quarters]:
+                prepared_data[idx]['action'] = ACTION_CONSUME
 
     interval_count = len(set(item['interval_id'] for item in prepared_data if item.get('interval_id', -1) >= 0 and item.get('action') in (ACTION_BUY, ACTION_SELL)))
 

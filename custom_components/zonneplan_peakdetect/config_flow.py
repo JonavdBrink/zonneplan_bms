@@ -12,6 +12,10 @@ import homeassistant.helpers.config_validation as cv
 from .const import (
     CONF_CHARGE_QUARTERS,
     CONF_DISCHARGE_QUARTERS,
+    CONF_CONSUME_QUARTERS,
+    CONF_SAVE_QUARTERS,
+    DEFAULT_CONSUME_QUARTERS,
+    DEFAULT_SAVE_QUARTERS,
     CONF_FORECAST_ENTITY,
     CONF_MIN_PROFIT,
     CONF_RTE_PERCENT,
@@ -66,6 +70,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             else:
                 discharge_default = DEFAULT_DISCHARGE_QUARTERS
 
+        consume_default = user_input.get(CONF_CONSUME_QUARTERS, discharge_default)
+        save_default = user_input.get(CONF_SAVE_QUARTERS, DEFAULT_SAVE_QUARTERS)
+
         return vol.Schema({
             vol.Required(
                 CONF_ALGORITHM,
@@ -91,6 +98,14 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 CONF_DISCHARGE_QUARTERS, 
                 default=discharge_default
             ): cv.positive_int,
+            vol.Required(
+                CONF_CONSUME_QUARTERS,
+                default=consume_default
+            ): vol.All(vol.Coerce(int), vol.Range(min=0)),
+            vol.Required(
+                CONF_SAVE_QUARTERS,
+                default=save_default
+            ): vol.All(vol.Coerce(int), vol.Range(min=0)),
             vol.Required(
                 CONF_FORECAST_ENTITY, 
                 default=user_input.get(CONF_FORECAST_ENTITY, DEFAULT_FORECAST_ENTITY)
@@ -126,13 +141,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             charge = user_input.get(CONF_CHARGE_QUANTILE)
             discharge = user_input.get(CONF_DISCHARGE_QUANTILE)
-            rte = user_input.get(CONF_RTE_PERCENT)
             
-            if charge is not None and discharge is not None and rte is not None:
-                if discharge < charge:
+            if charge is not None and discharge is not None:
+                if discharge <= charge:
                     errors["base"] = "quantile_order_error"
-                elif discharge < charge + rte:
-                    errors["base"] = "quantile_guard_band_error"
             
             if not errors:
                 return self.async_create_entry(
@@ -153,13 +165,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if user_input is not None:
             charge = user_input.get(CONF_CHARGE_QUANTILE)
             discharge = user_input.get(CONF_DISCHARGE_QUANTILE)
-            rte = user_input.get(CONF_RTE_PERCENT)
             
-            if charge is not None and discharge is not None and rte is not None:
-                if discharge < charge:
+            if charge is not None and discharge is not None:
+                if discharge <= charge:
                     errors["base"] = "quantile_order_error"
-                elif discharge < charge + rte:
-                    errors["base"] = "quantile_guard_band_error"
             
             if not errors:
                 return self.async_update_reload_and_abort(

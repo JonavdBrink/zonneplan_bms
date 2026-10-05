@@ -20,7 +20,9 @@ from custom_components.zonneplan_peakdetect.const import (
     CONF_CHARGE_QUANTILE,
     CONF_DISCHARGE_QUANTILE,
     MULTIPLIER_CPWL,
+    MULTIPLIER_BLOCK,
     ALGORITHM_WHSS,
+    ALGORITHM_MPES,
 )
 from custom_components.zonneplan_peakdetect.sensor import BatteryOptimizerSensor
 
@@ -377,7 +379,7 @@ async def test_config_flow_quantile_validation(hass):
     assert result2["type"] == "form"
     assert result2["errors"] == {"base": "quantile_order_error"}
 
-    # 2. Test guard band validation error: discharge < charge + rte (e.g. 70 < 60 + 20)
+    # 2. Test order validation error when equal: discharge <= charge (e.g. 60.0 <= 60.0)
     result3 = await hass.config_entries.flow.async_configure(
         result["flow_id"],
         {
@@ -391,13 +393,13 @@ async def test_config_flow_quantile_validation(hass):
             "solar_bonus_percent": 10.0,
             "solar_bonus_fixed_c_kwh": 2.0,
             CONF_CHARGE_QUANTILE: 60.0,
-            CONF_DISCHARGE_QUANTILE: 70.0, # 70 < 60 + 20
+            CONF_DISCHARGE_QUANTILE: 60.0, # 60 <= 60
         },
     )
     assert result3["type"] == "form"
-    assert result3["errors"] == {"base": "quantile_guard_band_error"}
+    assert result3["errors"] == {"base": "quantile_order_error"}
 
-    # 3. Test successful validation
+    # 3. Test successful validation when discharge > charge (e.g. 50 < 60, no rigid guard band required)
     result4 = await hass.config_entries.flow.async_configure(
         result["flow_id"],
         {
@@ -411,8 +413,230 @@ async def test_config_flow_quantile_validation(hass):
             "solar_bonus_percent": 10.0,
             "solar_bonus_fixed_c_kwh": 2.0,
             CONF_CHARGE_QUANTILE: 50.0,
-            CONF_DISCHARGE_QUANTILE: 75.0, # 75 >= 50 + 20 -> OK!
+            CONF_DISCHARGE_QUANTILE: 60.0, # 60 > 50 -> OK!
         },
     )
     assert result4["type"] == "create_entry"
+
+
+async def test_sensor_self_consumption_economic_guardrails(hass, freezer):
+    """Test that economic guardrails prevent premature Consume and unprofitable Save."""
+    freezer.move_to("2026-08-12T05:59:00+00:00")
+    
+    config_entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_FORECAST_ENTITY: "sensor.zonneplan_forecast",
+            CONF_ALGORITHM: ALGORITHM_WHSS,
+            CONF_MULTIPLIER_ALGORITHM: MULTIPLIER_BLOCK,
+            "charge_quarters": 0,       # No arbitrage to isolate self-consumption
+            "discharge_quarters": 0,    # No arbitrage to isolate self-consumption
+            CONF_RTE_PERCENT: 20.0,     # 20% loss (rte_factor = 0.8)
+            CONF_MIN_PROFIT: 6.0,       # 6 cents required
+            CONF_SOLAR_BONUS_PERCENT: 0.0,
+            CONF_SOLAR_BONUS_FIXED_C_KWH: 0.0,
+            CONF_CHARGE_QUANTILE: 50.0,
+            CONF_DISCHARGE_QUANTILE: 75.0,
+        },
+        entry_id="test_optimizer_entry_economic_guardrails",
+    )
+    config_entry.add_to_hass(hass)
+
+    # 1. Scenario A: Small spread (0.19 to 0.22 EUR/kWh). 
+    # Spread is 0.22 * 0.8 - 0.19 = -0.014 < 0.06 -> Not economically viable!
+    forecast_flat = [
+        {"datetime": "2026-08-12T04:00:00+00:00", "price_eur_kwh": 0.20},
+        {"datetime": "2026-08-12T12:00:00+00:00", "price_eur_kwh": 0.19},
+        {"datetime": "2026-08-12T18:00:00+00:00", "price_eur_kwh": 0.22},
+    ]
+
+    hass.states.async_set(
+        "sensor.zonneplan_forecast",
+        "0.20",
+        {"forecast": forecast_flat}
+    )
+
+    # Mock sunrise/sunset so 06:00 to 21:00 is daytime
+    sunrise = datetime(2026, 8, 12, 6, 0, tzinfo=timezone.utc)
+    sunset = datetime(2026, 8, 12, 21, 0, tzinfo=timezone.utc)
+
+    def astral_event(_hass, event, _date):
+        return sunrise if event == "sunrise" else sunset
+
+    with patch(
+        "custom_components.zonneplan_peakdetect.sensor.get_astral_event_date",
+        side_effect=astral_event,
+    ):
+        await hass.config_entries.async_setup(config_entry.entry_id)
+        await hass.async_block_till_done()
+
+    state = hass.states.get("sensor.battery_optimizer_action")
+    assert state is not None
+    schedule = state.attributes.get("schedule")
+
+    # On this flat day, even though 18:00 has highest multiplier and 12:00 has lowest,
+    # neither clears the 6-cent hurdle after 20% RTE loss -> both stay STOP!
+    assert schedule[1]["action"] == ACTION_STOP
+    assert schedule[2]["action"] == ACTION_STOP
+
+
+async def test_sensor_self_consumption_september30_economic_dispatch(hass, freezer, september30_forecast):
+    """Test that economic dispatch prevents morning Consume and prioritizes true evening peak on Sept 30."""
+    await hass.config.async_set_time_zone("Europe/Amsterdam")
+    hass.config.latitude = 52.3676
+    hass.config.longitude = 4.9041
+    hass.config.elevation = 0
+    freezer.move_to("2026-09-30T18:00:00+02:00")
+
+    config_entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_FORECAST_ENTITY: "sensor.zonneplan_forecast",
+            CONF_ALGORITHM: ALGORITHM_MPES,
+            CONF_MULTIPLIER_ALGORITHM: MULTIPLIER_BLOCK,
+            "charge_quarters": 10,
+            "discharge_quarters": 10,
+            CONF_RTE_PERCENT: 20.0,
+            CONF_MIN_PROFIT: 6.0,
+            CONF_SOLAR_BONUS_PERCENT: 10.0,
+            CONF_SOLAR_BONUS_FIXED_C_KWH: 2.0,
+            CONF_CHARGE_QUANTILE: 50.0,
+            CONF_DISCHARGE_QUANTILE: 75.0,
+        },
+        entry_id="test_optimizer_entry_sept30_economic",
+    )
+    config_entry.add_to_hass(hass)
+
+    hass.states.async_set(
+        "sensor.zonneplan_forecast",
+        "0.39",
+        {"forecast": september30_forecast}
+    )
+
+    await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get("sensor.battery_optimizer_action")
+    assert state is not None
+    schedule = state.attributes.get("schedule")
+
+    # 1. Verify clean 1.00 baseline at the 12:45 valley on Sept 30
+    slot_1245 = next(x for x in schedule if x["datetime"] == "2026-09-30T12:45:00+02:00")
+    assert slot_1245["price_multiplier"] == 1.0
+
+    # 2. Verify morning slots (09:30 - 10:30) are NOT prematurely discharged as Consume
+    morning_consume = [
+        x for x in schedule
+        if (x["datetime"].startswith("2026-09-30T09:30") or x["datetime"].startswith("2026-09-30T10:"))
+        and x["action"] == ACTION_CONSUME
+    ]
+    assert len(morning_consume) == 0
+
+    # 3. Verify evening peak slots (20:15 - 21:30) with €0.38 - €0.43 are scheduled as Consume
+    evening_consume = [
+        x for x in schedule
+        if (x["datetime"].startswith("2026-09-30T20:") or x["datetime"].startswith("2026-09-30T21:"))
+        and x["action"] == ACTION_CONSUME
+    ]
+    assert len(evening_consume) > 0
+
+
+async def test_sensor_solar_bonus_calculated_on_pre_tax_price(hass, freezer, october4_forecast):
+    """Test that solar bonus is computed from price_tax_excluded (kale marktprijs) when present."""
+    await hass.config.async_set_time_zone("Europe/Amsterdam")
+    hass.config.latitude = 52.3676
+    hass.config.longitude = 4.9041
+    hass.config.elevation = 0
+    freezer.move_to("2026-10-04T19:00:00+02:00")
+
+    config_entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_FORECAST_ENTITY: "sensor.zonneplan_forecast",
+            CONF_ALGORITHM: ALGORITHM_MPES,
+            CONF_MULTIPLIER_ALGORITHM: MULTIPLIER_BLOCK,
+            "charge_quarters": 10,
+            "discharge_quarters": 10,
+            CONF_RTE_PERCENT: 20.0,
+            CONF_MIN_PROFIT: 6.0,
+            CONF_SOLAR_BONUS_PERCENT: 10.0,
+            CONF_SOLAR_BONUS_FIXED_C_KWH: 2.0,
+        },
+        entry_id="test_optimizer_entry_oct4_pre_tax",
+    )
+    config_entry.add_to_hass(hass)
+
+    hass.states.async_set(
+        "sensor.zonneplan_forecast",
+        "0.41",
+        {"forecast": october4_forecast}
+    )
+
+    await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get("sensor.battery_optimizer_action")
+    assert state is not None
+    schedule = state.attributes.get("schedule")
+
+    # Find slot at 19:00 on Oct 4:
+    # raw tax-included price = 0.4121004
+    # raw pre-tax price = 0.3012523
+    # With 2c fixed + 10%:
+    # True pre-tax bonus = (0.3012523 + 0.02) * 1.10 - 0.3012523 = 0.0521252
+    slot_1900 = next(x for x in schedule if x["datetime"] == "2026-10-04T19:00:00+02:00")
+    assert round(slot_1900["price_bonus_eur_kwh"], 5) == 0.05213
+
+
+async def test_sensor_consume_and_save_quarters_budgeting(hass, freezer, september30_forecast):
+    """Test that consume_quarters and save_quarters strictly enforce capacity budgets."""
+    await hass.config.async_set_time_zone("Europe/Amsterdam")
+    hass.config.latitude = 52.3676
+    hass.config.longitude = 4.9041
+    hass.config.elevation = 0
+    freezer.move_to("2026-09-30T18:00:00+02:00")
+
+    # Configure strictly 4 consume quarters and 4 save quarters
+    config_entry = MockConfigEntry(
+        domain=DOMAIN,
+        data={
+            CONF_FORECAST_ENTITY: "sensor.zonneplan_forecast",
+            CONF_ALGORITHM: ALGORITHM_MPES,
+            CONF_MULTIPLIER_ALGORITHM: MULTIPLIER_BLOCK,
+            "charge_quarters": 10,
+            "discharge_quarters": 10,
+            "consume_quarters": 4,
+            "save_quarters": 4,
+            CONF_RTE_PERCENT: 20.0,
+            CONF_MIN_PROFIT: 6.0,
+            CONF_SOLAR_BONUS_PERCENT: 10.0,
+            CONF_SOLAR_BONUS_FIXED_C_KWH: 2.0,
+            CONF_CHARGE_QUANTILE: 50.0,
+            CONF_DISCHARGE_QUANTILE: 75.0,
+        },
+        entry_id="test_optimizer_entry_budgeting",
+    )
+    config_entry.add_to_hass(hass)
+
+    hass.states.async_set(
+        "sensor.zonneplan_forecast",
+        "0.39",
+        {"forecast": september30_forecast}
+    )
+
+    await hass.config_entries.async_setup(config_entry.entry_id)
+    await hass.async_block_till_done()
+
+    state = hass.states.get("sensor.battery_optimizer_action")
+    assert state is not None
+    assert state.attributes.get("consume_quarters") == 4
+    assert state.attributes.get("save_quarters") == 4
+
+    schedule = state.attributes.get("schedule")
+    consume_slots = [x for x in schedule if x["action"] == ACTION_CONSUME]
+    assert len(consume_slots) <= 4
+
+
+
+
 
