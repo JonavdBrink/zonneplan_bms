@@ -20,6 +20,10 @@ from .const import (
     ACTION_STOP,
     CONF_CHARGE_QUARTERS,
     CONF_DISCHARGE_QUARTERS,
+    CONF_CONSUME_QUARTERS,
+    CONF_SAVE_QUARTERS,
+    DEFAULT_CONSUME_QUARTERS,
+    DEFAULT_SAVE_QUARTERS,
     CONF_FORECAST_ENTITY,
     CONF_MIN_PROFIT,
     CONF_RTE_PERCENT,
@@ -68,6 +72,12 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: Any, async_add_en
     if discharge_quarters is None:
         discharge_quarters = config.get("discharge_hours", 2) * 4
 
+    consume_quarters = config.get(
+        CONF_CONSUME_QUARTERS,
+        config.get(CONF_DISCHARGE_QUARTERS, DEFAULT_CONSUME_QUARTERS)
+    )
+    save_quarters = config.get(CONF_SAVE_QUARTERS, DEFAULT_SAVE_QUARTERS)
+
     price_delta_percent = config.get(CONF_RTE_PERCENT)
     if price_delta_percent is None:
         price_delta_percent = config.get("price_delta_threshold_percent")
@@ -104,6 +114,8 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: Any, async_add_en
             charge_multiplier_quantile,
             discharge_multiplier_quantile,
             solar_bonus_in_arbitrage,
+            consume_quarters,
+            save_quarters,
             SENSOR_DESCRIPTION
         )
     ], True)
@@ -138,7 +150,9 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         charge_multiplier_quantile: float,
         discharge_multiplier_quantile: float,
         solar_bonus_in_arbitrage: bool,
-        description: SensorEntityDescription
+        consume_quarters: int = DEFAULT_CONSUME_QUARTERS,
+        save_quarters: int = DEFAULT_SAVE_QUARTERS,
+        description: SensorEntityDescription = SENSOR_DESCRIPTION,
     ) -> None:
         """Initialize the sensor."""
         self.entity_description = description
@@ -147,6 +161,8 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         self._forecast_entity_id = forecast_entity_id
         self._charge_quarters = charge_quarters
         self._discharge_quarters = discharge_quarters
+        self._consume_quarters = consume_quarters
+        self._save_quarters = save_quarters
         self._price_delta_percent = price_delta_percent
         self._algorithm_type = algorithm_type
         self._multiplier_type = multiplier_type
@@ -164,6 +180,8 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
             "min_profit_required_eur_kwh": self._min_profit_eur_kwh,
             "charge_quarters": self._charge_quarters,
             "discharge_quarters": self._discharge_quarters,
+            "consume_quarters": self._consume_quarters,
+            "save_quarters": self._save_quarters,
             "price_delta_threshold_percent": self._price_delta_percent,
             "algorithm_type": self._algorithm_type,
             "multiplier_type": self._multiplier_type,
@@ -296,9 +314,24 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
             else:
                 LOGGER.warning("Incomplete forecast data (missing price) at index %d: %s", idx, item)
                 continue
+
+            ex_tax_price = None
+            price_tax_excluded = item.get('price_tax_excluded')
+            if isinstance(price_tax_excluded, dict):
+                ex_tax_raw = price_tax_excluded.get('amount')
+                if ex_tax_raw is not None:
+                    ex_tax_price = self._convert_price(ex_tax_raw)
+            elif price_tax_excluded is not None:
+                ex_tax_price = float(price_tax_excluded)
+            elif 'price_tax_excluded_eur_kwh' in item:
+                ex_tax_price = float(item['price_tax_excluded_eur_kwh'])
                 
             dt = _parse_datetime(raw_dt)
             is_passed = dt < now if dt else False
+            
+            # Base price for solar bonus calculation: use pre-tax price if available, else tax-included price
+            base_ex_tax = ex_tax_price if ex_tax_price is not None else price
+
             solar_bonus_applied = bool(
                 dt
                 and (
@@ -306,20 +339,30 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                     or self._solar_bonus_fixed_eur_kwh > 0
                 )
                 and self._solar_bonus_applies(dt, solar_bonus_windows)
+                and (base_ex_tax + self._solar_bonus_fixed_eur_kwh > 0)
             )
+
+            bonus_amount = 0.0
+            if solar_bonus_applied:
+                # Zonneplan formula: Total feed-in payout = (P_ex_tax + fixed_markup) * (1 + bonus_percent / 100)
+                # The bonus added on top of base market price is:
+                # (P_ex_tax + fixed_markup) * (1 + bonus_percent / 100) - P_ex_tax
+                bonus_amount = round(
+                    (base_ex_tax + self._solar_bonus_fixed_eur_kwh) * (1.0 + self._solar_bonus_percent / 100.0) - base_ex_tax,
+                    7
+                )
+
             effective_price = price
             if solar_bonus_applied and self._solar_bonus_in_arbitrage:
-                effective_price = (
-                    price + self._solar_bonus_fixed_eur_kwh
-                ) * (1.0 + self._solar_bonus_percent / 100.0)
+                effective_price = price + bonus_amount
 
-            actual_effective_price = (
-                price + self._solar_bonus_fixed_eur_kwh
-            ) * (1.0 + self._solar_bonus_percent / 100.0) if solar_bonus_applied else price
+            actual_effective_price = price + bonus_amount if solar_bonus_applied else price
 
             prepared_data.append({
                 'datetime': raw_dt,
                 'price_eur_kwh': price,
+                'price_tax_excluded': ex_tax_price,
+                'price_bonus_eur_kwh': bonus_amount,
                 'buy_price_eur_kwh': price,
                 'sell_price_eur_kwh': effective_price,
                 'forecast_price_eur_kwh': price,
@@ -367,15 +410,19 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         # Recalculate price_multiplier using continuous linear interpolation of divisors between wave valleys
         n = len(schedule)
         if n > 0:
-            # 1. Find the valley index and price for each active wave (interval_id >= 0)
+            # 1. Find the valley and peak index and price for each active wave (interval_id >= 0)
             valleys = {}
+            peaks = {}
             for idx, item in enumerate(schedule):
                 iid = item.get('interval_id', -1)
                 if item.get('action') in (ACTION_BUY, ACTION_SELL):
                     if iid >= 0:
-                        price = item.get('buy_price_eur_kwh', item['price_eur_kwh'])
-                        if iid not in valleys or price < valleys[iid]['price']:
-                            valleys[iid] = {'idx': idx, 'price': price}
+                        buy_price = item.get('buy_price_eur_kwh', item['price_eur_kwh'])
+                        if iid not in valleys or buy_price < valleys[iid]['price']:
+                            valleys[iid] = {'idx': idx, 'price': buy_price}
+                        sell_price = item.get('sell_price_eur_kwh', item['price_eur_kwh'])
+                        if iid not in peaks or sell_price > peaks[iid]['price']:
+                            peaks[iid] = {'idx': idx, 'price': sell_price}
             
             # Sort waves to ensure correct chronological sequence
             active_wave_ids = sorted(valleys.keys())
@@ -409,33 +456,39 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
 
                 # 3. Calculate divisor for each interval in the timeline
                 if self._multiplier_type == MULTIPLIER_BLOCK:
-                    # Partition into windows anchored at the end of each active wave segment
+                    # Partition into windows spanning between adjacent active wave segments
                     windows = []
                     prev_end = 0
-                    for iid in active_wave_ids:
-                        active_indices = [idx for idx, item in enumerate(schedule) if item.get('interval_id', -1) == iid and item.get('action') != ACTION_STOP]
-                        end_idx = (max(active_indices) + 1) if active_indices else n
+                    for k in range(len(active_wave_ids)):
+                        iid = active_wave_ids[k]
+                        if k == len(active_wave_ids) - 1:
+                            end_idx = n
+                        else:
+                            next_iid = active_wave_ids[k + 1]
+                            curr_active = [idx for idx, item in enumerate(schedule) if item.get('interval_id', -1) == iid and item.get('action') in (ACTION_BUY, ACTION_SELL)]
+                            next_active = [idx for idx, item in enumerate(schedule) if item.get('interval_id', -1) == next_iid and item.get('action') in (ACTION_BUY, ACTION_SELL)]
+                            if curr_active and next_active:
+                                end_idx = (max(curr_active) + min(next_active)) // 2
+                            elif curr_active:
+                                end_idx = max(curr_active) + 1
+                            else:
+                                end_idx = n
                         windows.append((prev_end, end_idx))
                         prev_end = end_idx
-                    
-                    if windows:
-                        # Extend the last window to cover the trailing part of the day
-                        last_start, _ = windows[-1]
-                        windows[-1] = (last_start, n)
 
-                    # For each window, find its minimum price and calculate multipliers
+                    # For each window, find its minimum price and calculate multipliers using import price
                     for start, end in windows:
                         window_slice = schedule[start:end]
                         if window_slice:
                             window_min = min(item.get('buy_price_eur_kwh', item['price_eur_kwh']) for item in window_slice)
                             for item in window_slice:
-                                p = item.get('sell_price_eur_kwh', item['price_eur_kwh'])
+                                p = item.get('buy_price_eur_kwh', item['price_eur_kwh'])
                                 item['price_multiplier'] = round(p / window_min, 2) if window_min > 0 else round(1.0 + p / abs(window_min), 2) if window_min != 0 else 1.0
                 else: # MULTIPLIER_CPWL
                     anchors = [(valleys[iid]['idx'], valleys[iid]['price']) for iid in active_wave_ids]
                     
                     for idx, item in enumerate(schedule):
-                        p = item.get('sell_price_eur_kwh', item['price_eur_kwh'])
+                        p = item.get('buy_price_eur_kwh', item['price_eur_kwh'])
                         
                         # If before the first valley, lock to first valley price
                         if idx <= anchors[0][0]:
@@ -458,23 +511,80 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
                         # Compute multiplier
                         item['price_multiplier'] = round(p / divisor, 2) if divisor > 0 else round(1.0 + p / abs(divisor), 2) if divisor != 0 else 1.0
 
-        # Apply Charge/Discharge logic based on multiplier quantiles
+        # Apply Charge/Discharge logic based on multiplier quantiles with economic guardrails
         if n > 0:
             multipliers = [item.get('price_multiplier', 1.0) for item in schedule]
             charge_threshold = self._get_quantile_value(multipliers, self._charge_multiplier_quantile)
             discharge_threshold = self._get_quantile_value(multipliers, self._discharge_multiplier_quantile)
+            global_min = min(item.get('buy_price_eur_kwh', item['price_eur_kwh']) for item in schedule)
+            global_max = max(item.get('sell_price_eur_kwh', item['price_eur_kwh']) for item in schedule)
 
-            for item in schedule:
+            # 1. Identify Save slots (solar saving into battery)
+            save_candidates = []
+            for idx, item in enumerate(schedule):
                 if item.get('action') == ACTION_STOP:
                     dt = _parse_datetime(item.get('datetime'))
                     sun_above_horizon = bool(
                         dt and self._solar_bonus_applies(dt, solar_bonus_windows)
                     )
                     mult = item.get('price_multiplier', 1.0)
-                    if sun_above_horizon and charge_threshold is not None and mult < charge_threshold:
-                        item['action'] = ACTION_SAVE
-                    elif discharge_threshold is not None and mult >= discharge_threshold:
-                        item['action'] = ACTION_CONSUME
+                    iid = item.get('interval_id', -1)
+                    peak_price = peaks[iid]['price'] if (iid >= 0 and iid in peaks) else global_max
+                    sell_p = item.get('sell_price_eur_kwh', item['price_eur_kwh'])
+
+                    can_save = (
+                        sun_above_horizon
+                        and charge_threshold is not None
+                        and mult <= charge_threshold
+                        and (peak_price * rte_factor - sell_p >= self._min_profit_eur_kwh)
+                    )
+                    if can_save:
+                        save_candidates.append(idx)
+
+            # Capacity-aware allocation for Save: sort by lowest opportunity cost first if save_quarters configured
+            if self._save_quarters > 0 and len(save_candidates) > self._save_quarters:
+                save_candidates.sort(
+                    key=lambda i: (
+                        schedule[i].get('sell_price_eur_kwh', schedule[i]['price_eur_kwh']),
+                        schedule[i].get('price_multiplier', 1.0)
+                    )
+                )
+                save_candidates = save_candidates[:self._save_quarters]
+
+            for idx in save_candidates:
+                schedule[idx]['action'] = ACTION_SAVE
+
+            # 2. Identify and rank Consume candidates (avoiding expensive grid import)
+            consume_candidates = []
+            for idx, item in enumerate(schedule):
+                if item.get('action') == ACTION_STOP:
+                    mult = item.get('price_multiplier', 1.0)
+                    iid = item.get('interval_id', -1)
+                    valley_price = valleys[iid]['price'] if (iid >= 0 and iid in valleys) else global_min
+                    buy_p = item.get('buy_price_eur_kwh', item['price_eur_kwh'])
+
+                    can_consume = (
+                        discharge_threshold is not None
+                        and mult >= discharge_threshold
+                        and mult >= 1.30  # Absolute floor: avoid cycling on low-spread flat days
+                        and (buy_p * rte_factor - valley_price >= self._min_profit_eur_kwh)
+                    )
+                    if can_consume:
+                        consume_candidates.append(idx)
+
+            # Sort Consume candidates by price descending to discharge during highest peaks first
+            consume_candidates.sort(
+                key=lambda i: (
+                    schedule[i].get('buy_price_eur_kwh', schedule[i]['price_eur_kwh']),
+                    schedule[i].get('price_multiplier', 1.0)
+                ),
+                reverse=True
+            )
+
+            # Capacity-aware allocation: discharge during top-impact hours
+            max_consume_quarters = self._consume_quarters if self._consume_quarters > 0 else len(consume_candidates)
+            for idx in consume_candidates[:max_consume_quarters]:
+                schedule[idx]['action'] = ACTION_CONSUME
 
         # Read total active interval count directly from scheduled data attributes
         intervals = len(set(h['interval_id'] for h in schedule if h.get('interval_id', -1) >= 0 and h.get('action') in (ACTION_BUY, ACTION_SELL)))
@@ -483,13 +593,7 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         # Format output keys for Home Assistant attributes
         formatted_schedule = []
         for item in schedule:
-            actual_sell_price = item['sell_price_eur_kwh']
-            if not self._solar_bonus_in_arbitrage and item.get('solar_bonus_applied'):
-                actual_sell_price = (
-                    item['price_eur_kwh'] + self._solar_bonus_fixed_eur_kwh
-                ) * (1.0 + self._solar_bonus_percent / 100.0)
-            
-            bonus_amount = round(actual_sell_price - item['price_eur_kwh'], 7) if item.get('solar_bonus_applied') else 0.0
+            bonus_amount = item.get('price_bonus_eur_kwh', 0.0) if item.get('solar_bonus_applied') else 0.0
             formatted_schedule.append({
                 'datetime': item['datetime'],
                 'price_eur_kwh': item['price_eur_kwh'],

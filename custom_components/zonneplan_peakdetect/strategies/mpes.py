@@ -67,8 +67,8 @@ class MpesStrategy(ArbitrageStrategy):
             midpoint = (v_idx + p_idx) // 2
 
             # Define search range bounds to prevent overlap with adjacent cycles
-            start_search = 0 if cycle_id == 0 else cycles[cycle_id-1]['peak_idx']
-            end_search = n if cycle_id == len(cycles) - 1 else cycles[cycle_id+1]['valley_idx']
+            start_search = 0 if cycle_id == 0 else (cycles[cycle_id-1]['peak_idx'] + v_idx) // 2
+            end_search = n if cycle_id == len(cycles) - 1 else (p_idx + cycles[cycle_id+1]['valley_idx']) // 2
 
             # Separate into charge pool (before midpoint) and discharge pool (after midpoint)
             charge_segment_indices = list(range(start_search, midpoint))
