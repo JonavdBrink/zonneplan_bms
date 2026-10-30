@@ -22,7 +22,8 @@ class MpesStrategy(ArbitrageStrategy):
         discharge_slots_count: int,
         rte_factor: float,
         min_profit_eur_kwh: float,
-        now: datetime
+        now: datetime,
+        greedy_charge: bool = False,
     ) -> list[dict[str, Any]]:
         n = len(prepared_data)
         if n < 2:
@@ -87,9 +88,10 @@ class MpesStrategy(ArbitrageStrategy):
             discharge_cands = [x for x in discharge_cands if sell_prices[x] * rte_factor - c['valley_price'] >= min_profit_eur_kwh]
             discharge_slots = discharge_cands[:discharge_slots_count]
 
-            # Balance slots to ensure symmetric charge/discharge cycle
+            # Greedy charging reserves the surplus for self-consumption.
             num_slots = min(len(charge_slots), len(discharge_slots))
-            charge_slots = charge_slots[:num_slots]
+            if not greedy_charge:
+                charge_slots = charge_slots[:num_slots]
             discharge_slots = discharge_slots[:num_slots]
 
             if num_slots > 0:

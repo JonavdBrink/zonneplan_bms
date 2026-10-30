@@ -20,6 +20,7 @@ from .const import (
     ACTION_STOP,
     CONF_CHARGE_QUARTERS,
     CONF_DISCHARGE_QUARTERS,
+    CONF_GREEDY_CHARGE,
     CONF_FORECAST_ENTITY,
     CONF_MIN_PROFIT,
     CONF_RTE_PERCENT,
@@ -31,6 +32,7 @@ from .const import (
     CONF_CHARGE_QUANTILE,
     CONF_DISCHARGE_QUANTILE,
     DEFAULT_ALGORITHM,
+    DEFAULT_GREEDY_CHARGE,
     DEFAULT_MULTIPLIER_ALGORITHM,
     DEFAULT_CENTS,
     DEFAULT_PERCENTAGE,
@@ -104,7 +106,8 @@ async def async_setup_entry(hass: HomeAssistant, config_entry: Any, async_add_en
             charge_multiplier_quantile,
             discharge_multiplier_quantile,
             solar_bonus_in_arbitrage,
-            SENSOR_DESCRIPTION
+            SENSOR_DESCRIPTION,
+            greedy_charge=config.get(CONF_GREEDY_CHARGE, DEFAULT_GREEDY_CHARGE),
         )
     ], True)
 
@@ -138,7 +141,8 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         charge_multiplier_quantile: float,
         discharge_multiplier_quantile: float,
         solar_bonus_in_arbitrage: bool,
-        description: SensorEntityDescription
+        description: SensorEntityDescription,
+        greedy_charge: bool = DEFAULT_GREEDY_CHARGE,
     ) -> None:
         """Initialize the sensor."""
         self.entity_description = description
@@ -147,6 +151,7 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
         self._forecast_entity_id = forecast_entity_id
         self._charge_quarters = charge_quarters
         self._discharge_quarters = discharge_quarters
+        self._greedy_charge = greedy_charge
         self._price_delta_percent = price_delta_percent
         self._algorithm_type = algorithm_type
         self._multiplier_type = multiplier_type
@@ -164,6 +169,7 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
             "min_profit_required_eur_kwh": self._min_profit_eur_kwh,
             "charge_quarters": self._charge_quarters,
             "discharge_quarters": self._discharge_quarters,
+            "greedy_charge": self._greedy_charge,
             "price_delta_threshold_percent": self._price_delta_percent,
             "algorithm_type": self._algorithm_type,
             "multiplier_type": self._multiplier_type,
@@ -361,7 +367,8 @@ class BatteryOptimizerSensor(SensorEntity, RestoreEntity):
             discharge_slots_count,
             rte_factor,
             self._min_profit_eur_kwh,
-            now
+            now,
+            greedy_charge=self._greedy_charge,
         )
         
         # Recalculate price_multiplier using continuous linear interpolation of divisors between wave valleys

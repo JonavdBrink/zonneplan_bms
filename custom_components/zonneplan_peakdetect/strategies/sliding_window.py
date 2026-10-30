@@ -24,7 +24,8 @@ class HswasStrategy(ArbitrageStrategy):
         discharge_slots_count: int,
         rte_factor: float,
         min_profit_eur_kwh: float,
-        now: datetime
+        now: datetime,
+        greedy_charge: bool = False,
     ) -> list[dict[str, Any]]:
         """Calculates the BESS schedule using the Advanced (HSWAS) [β] Sliding Window."""
         buy_prices = [item.get('buy_price_eur_kwh', item['price_eur_kwh']) for item in prepared_data]

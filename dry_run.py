@@ -98,7 +98,8 @@ def calculate_action_schedule(
     solar_bonus_fixed_c_kwh=2.0,
     charge_multiplier_quantile=50.0,
     discharge_multiplier_quantile=75.0,
-    solar_bonus_in_arbitrage=True
+    solar_bonus_in_arbitrage=True,
+    greedy_charge=False,
 ):
     """Polymorphically runs the chosen BESS Arbitrage strategy and post-processes multipliers."""
     if not forecast_data:
@@ -189,7 +190,8 @@ def calculate_action_schedule(
         discharge_slots_count,
         rte_factor,
         min_profit_eur_kwh,
-        now
+        now,
+        greedy_charge=greedy_charge,
     )
 
     # 3. Post-Process Multipliers using the same logic as sensor.py
@@ -581,6 +583,7 @@ def main():
     parser.add_argument("-a", "--algorithm", choices=[ALGORITHM_WHSS, ALGORITHM_HSWAS, ALGORITHM_MPES], default=ALGORITHM_WHSS, help="BESS Arbitrage algorithm strategy to run")
     parser.add_argument("-m", "--multiplier-algorithm", choices=[MULTIPLIER_CPWL, MULTIPLIER_BLOCK], default=MULTIPLIER_BLOCK, help="Multiplier baseline calculation algorithm")
     parser.add_argument("-d", "--disable-solar-bonus-in-arbitrage", dest="solar_bonus_in_arbitrage", action="store_false", help="Disable using the solar bonus advantage during arbitrage cycle planning")
+    parser.add_argument("--greedy-charge", action="store_true", help="Allow extra charging for self-consumption without increasing sell slots (WHSS/MPES)")
     
     args = parser.parse_args()
 
@@ -592,6 +595,7 @@ def main():
     solar_bonus_percent = 10.0
     solar_bonus_fixed_c_kwh = 2.0
     solar_bonus_in_arbitrage = args.solar_bonus_in_arbitrage
+    greedy_charge = args.greedy_charge
     charge_multiplier_quantile = 50.0
     discharge_multiplier_quantile = 75.0
     algorithm_type = args.algorithm
@@ -627,6 +631,8 @@ def main():
                         charge_quarters = attrs['charge_quarters']
                     if 'discharge_quarters' in attrs:
                         discharge_quarters = attrs['discharge_quarters']
+                    if 'greedy_charge' in attrs:
+                        greedy_charge = attrs['greedy_charge'] or args.greedy_charge
                     if 'min_profit_required_eur_kwh' in attrs:
                         min_profit = attrs['min_profit_required_eur_kwh']
                     if 'price_delta_threshold_percent' in attrs:
@@ -673,7 +679,8 @@ def main():
         solar_bonus_fixed_c_kwh=solar_bonus_fixed_c_kwh,
         charge_multiplier_quantile=charge_multiplier_quantile,
         discharge_multiplier_quantile=discharge_multiplier_quantile,
-        solar_bonus_in_arbitrage=solar_bonus_in_arbitrage
+        solar_bonus_in_arbitrage=solar_bonus_in_arbitrage,
+        greedy_charge=greedy_charge,
     )
     
     active_intervals = len(set(item['interval_id'] for item in schedule if item.get('interval_id', -1) >= 0 and item.get('action') in (ACTION_BUY, ACTION_SELL)))
@@ -709,7 +716,7 @@ def main():
     print(" BESS ARBITRAGE SCHEDULER - ALGORITHM TEST RESULTS")
     print("=" * 110)
     print(f"Total Intervals Segmented: {active_intervals}")
-    print(f"Configuration: strategy={algorithm_type}, multiplier={multiplier_type}, charge_quarters={charge_quarters}, discharge_quarters={discharge_quarters}, min_profit={min_profit}, price_delta_percent={price_delta_percent}, solar_bonus_percent={solar_bonus_percent}, solar_bonus_fixed_c_kwh={solar_bonus_fixed_c_kwh}")
+    print(f"Configuration: strategy={algorithm_type}, multiplier={multiplier_type}, charge_quarters={charge_quarters}, discharge_quarters={discharge_quarters}, greedy_charge={greedy_charge}, min_profit={min_profit}, price_delta_percent={price_delta_percent}, solar_bonus_percent={solar_bonus_percent}, solar_bonus_fixed_c_kwh={solar_bonus_fixed_c_kwh}")
     print("-" * 110)
     print(f"{'Datetime':<30} | {'Price (€/kWh)':<14} | {'Zonnebonus (€/kWh)':<19} | {'Multiplier':<11} | {'Action':<10} | {'Interval ID':<11}")
     print("-" * 110)
