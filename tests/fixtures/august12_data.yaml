@@ -1,320 +1,480 @@
 - datetime: '2026-08-12T08:00:00+02:00'
   price_eur_kwh: 0.3431909
+  price_tax_excluded: 0.2323428
 - datetime: '2026-08-12T08:15:00+02:00'
   price_eur_kwh: 0.3246053
+  price_tax_excluded: 0.2137572
 - datetime: '2026-08-12T08:30:00+02:00'
   price_eur_kwh: 0.3076895
+  price_tax_excluded: 0.1968414
 - datetime: '2026-08-12T08:45:00+02:00'
   price_eur_kwh: 0.2989533
+  price_tax_excluded: 0.1881052
 - datetime: '2026-08-12T09:00:00+02:00'
   price_eur_kwh: 0.3271099
+  price_tax_excluded: 0.2162618
 - datetime: '2026-08-12T09:15:00+02:00'
   price_eur_kwh: 0.2956016
+  price_tax_excluded: 0.1847535
 - datetime: '2026-08-12T09:30:00+02:00'
   price_eur_kwh: 0.2718251
+  price_tax_excluded: 0.160977
 - datetime: '2026-08-12T09:45:00+02:00'
   price_eur_kwh: 0.2527797
+  price_tax_excluded: 0.1419316
 - datetime: '2026-08-12T10:00:00+02:00'
   price_eur_kwh: 0.2742088
+  price_tax_excluded: 0.1633607
 - datetime: '2026-08-12T10:15:00+02:00'
   price_eur_kwh: 0.2501661
+  price_tax_excluded: 0.139318
 - datetime: '2026-08-12T10:30:00+02:00'
   price_eur_kwh: 0.2295598
+  price_tax_excluded: 0.1187117
 - datetime: '2026-08-12T10:45:00+02:00'
   price_eur_kwh: 0.1936107
+  price_tax_excluded: 0.0827626
 - datetime: '2026-08-12T11:00:00+02:00'
   price_eur_kwh: 0.2084452
+  price_tax_excluded: 0.0975971
 - datetime: '2026-08-12T11:15:00+02:00'
   price_eur_kwh: 0.181668
+  price_tax_excluded: 0.0708199
 - datetime: '2026-08-12T11:30:00+02:00'
   price_eur_kwh: 0.1704028
+  price_tax_excluded: 0.0595547
 - datetime: '2026-08-12T11:45:00+02:00'
   price_eur_kwh: 0.1429117
+  price_tax_excluded: 0.0320636
 - datetime: '2026-08-12T12:00:00+02:00'
   price_eur_kwh: 0.1308359
+  price_tax_excluded: 0.0199878
 - datetime: '2026-08-12T12:15:00+02:00'
   price_eur_kwh: 0.1308359
+  price_tax_excluded: 0.0199878
 - datetime: '2026-08-12T12:30:00+02:00'
   price_eur_kwh: 0.1308359
+  price_tax_excluded: 0.0199878
 - datetime: '2026-08-12T12:45:00+02:00'
   price_eur_kwh: 0.1308238
+  price_tax_excluded: 0.0199757
 - datetime: '2026-08-12T13:00:00+02:00'
   price_eur_kwh: 0.1308117
+  price_tax_excluded: 0.0199636
 - datetime: '2026-08-12T13:15:00+02:00'
   price_eur_kwh: 0.1271818
+  price_tax_excluded: 0.0163337
 - datetime: '2026-08-12T13:30:00+02:00'
   price_eur_kwh: 0.1271818
+  price_tax_excluded: 0.0163337
 - datetime: '2026-08-12T13:45:00+02:00'
   price_eur_kwh: 0.1271696
+  price_tax_excluded: 0.0163215
 - datetime: '2026-08-12T14:00:00+02:00'
   price_eur_kwh: 0.121168
+  price_tax_excluded: 0.0103199
 - datetime: '2026-08-12T14:15:00+02:00'
   price_eur_kwh: 0.1223175
+  price_tax_excluded: 0.0114694
 - datetime: '2026-08-12T14:30:00+02:00'
   price_eur_kwh: 0.1271454
+  price_tax_excluded: 0.0162973
 - datetime: '2026-08-12T14:45:00+02:00'
   price_eur_kwh: 0.1308359
+  price_tax_excluded: 0.0199878
 - datetime: '2026-08-12T15:00:00+02:00'
   price_eur_kwh: 0.1308359
+  price_tax_excluded: 0.0199878
 - datetime: '2026-08-12T15:15:00+02:00'
   price_eur_kwh: 0.130848
+  price_tax_excluded: 0.0199999
 - datetime: '2026-08-12T15:30:00+02:00'
   price_eur_kwh: 0.1337399
+  price_tax_excluded: 0.0228918
 - datetime: '2026-08-12T15:45:00+02:00'
   price_eur_kwh: 0.1775297
+  price_tax_excluded: 0.0666816
 - datetime: '2026-08-12T16:00:00+02:00'
   price_eur_kwh: 0.1959097
+  price_tax_excluded: 0.0850616
 - datetime: '2026-08-12T16:15:00+02:00'
   price_eur_kwh: 0.2256757
+  price_tax_excluded: 0.1148276
 - datetime: '2026-08-12T16:30:00+02:00'
   price_eur_kwh: 0.2619394
+  price_tax_excluded: 0.1510913
 - datetime: '2026-08-12T16:45:00+02:00'
   price_eur_kwh: 0.2538808
+  price_tax_excluded: 0.1430327
 - datetime: '2026-08-12T17:00:00+02:00'
   price_eur_kwh: 0.26419
+  price_tax_excluded: 0.1533419
 - datetime: '2026-08-12T17:15:00+02:00'
   price_eur_kwh: 0.2899509
+  price_tax_excluded: 0.1791028
 - datetime: '2026-08-12T17:30:00+02:00'
   price_eur_kwh: 0.3088874
+  price_tax_excluded: 0.1980393
 - datetime: '2026-08-12T17:45:00+02:00'
   price_eur_kwh: 0.3408072
+  price_tax_excluded: 0.2299591
 - datetime: '2026-08-12T18:00:00+02:00'
   price_eur_kwh: 0.3194386
+  price_tax_excluded: 0.2085905
 - datetime: '2026-08-12T18:15:00+02:00'
   price_eur_kwh: 0.3409766
+  price_tax_excluded: 0.2301285
 - datetime: '2026-08-12T18:30:00+02:00'
   price_eur_kwh: 0.3552424
+  price_tax_excluded: 0.2443943
 - datetime: '2026-08-12T18:45:00+02:00'
   price_eur_kwh: 0.3961647
+  price_tax_excluded: 0.2853166
 - datetime: '2026-08-12T19:00:00+02:00'
   price_eur_kwh: 0.384948
+  price_tax_excluded: 0.2740999
 - datetime: '2026-08-12T19:15:00+02:00'
   price_eur_kwh: 0.4230993
+  price_tax_excluded: 0.3122512
 - datetime: '2026-08-12T19:30:00+02:00'
   price_eur_kwh: 0.478481
+  price_tax_excluded: 0.3676329
 - datetime: '2026-08-12T19:45:00+02:00'
   price_eur_kwh: 0.6888637
+  price_tax_excluded: 0.5780156
 - datetime: '2026-08-12T20:00:00+02:00'
   price_eur_kwh: 0.617873
+  price_tax_excluded: 0.5070249
 - datetime: '2026-08-12T20:15:00+02:00'
   price_eur_kwh: 0.5075815
+  price_tax_excluded: 0.3967334
 - datetime: '2026-08-12T20:30:00+02:00'
   price_eur_kwh: 0.4348363
+  price_tax_excluded: 0.3239882
 - datetime: '2026-08-12T20:45:00+02:00'
   price_eur_kwh: 0.4117737
+  price_tax_excluded: 0.3009256
 - datetime: '2026-08-12T21:00:00+02:00'
   price_eur_kwh: 0.436978
+  price_tax_excluded: 0.3261299
 - datetime: '2026-08-12T21:15:00+02:00'
   price_eur_kwh: 0.4250232
+  price_tax_excluded: 0.3141751
 - datetime: '2026-08-12T21:30:00+02:00'
   price_eur_kwh: 0.4011499
+  price_tax_excluded: 0.2903018
 - datetime: '2026-08-12T21:45:00+02:00'
   price_eur_kwh: 0.3716017
+  price_tax_excluded: 0.2607536
 - datetime: '2026-08-12T22:00:00+02:00'
   price_eur_kwh: 0.3796724
+  price_tax_excluded: 0.2688243
 - datetime: '2026-08-12T22:15:00+02:00'
   price_eur_kwh: 0.364862
+  price_tax_excluded: 0.2540139
 - datetime: '2026-08-12T22:30:00+02:00'
   price_eur_kwh: 0.3589209
+  price_tax_excluded: 0.2480728
 - datetime: '2026-08-12T22:45:00+02:00'
   price_eur_kwh: 0.3427432
+  price_tax_excluded: 0.2318951
 - datetime: '2026-08-12T23:00:00+02:00'
   price_eur_kwh: 0.3489989
+  price_tax_excluded: 0.2381508
 - datetime: '2026-08-12T23:15:00+02:00'
   price_eur_kwh: 0.341509
+  price_tax_excluded: 0.2306609
 - datetime: '2026-08-12T23:30:00+02:00'
   price_eur_kwh: 0.3412791
+  price_tax_excluded: 0.230431
 - datetime: '2026-08-12T23:45:00+02:00'
   price_eur_kwh: 0.324569
+  price_tax_excluded: 0.2137209
 - datetime: '2026-08-13T00:00:00+02:00'
   price_eur_kwh: 0.3298567
+  price_tax_excluded: 0.2190086
 - datetime: '2026-08-13T00:15:00+02:00'
   price_eur_kwh: 0.3202856
+  price_tax_excluded: 0.2094375
 - datetime: '2026-08-13T00:30:00+02:00'
   price_eur_kwh: 0.3150825
+  price_tax_excluded: 0.2042344
 - datetime: '2026-08-13T00:45:00+02:00'
   price_eur_kwh: 0.3040232
+  price_tax_excluded: 0.1931751
 - datetime: '2026-08-13T01:00:00+02:00'
   price_eur_kwh: 0.315978
+  price_tax_excluded: 0.2051299
 - datetime: '2026-08-13T01:15:00+02:00'
   price_eur_kwh: 0.3099401
+  price_tax_excluded: 0.199092
 - datetime: '2026-08-13T01:30:00+02:00'
   price_eur_kwh: 0.3090689
+  price_tax_excluded: 0.1982208
 - datetime: '2026-08-13T01:45:00+02:00'
   price_eur_kwh: 0.3027527
+  price_tax_excluded: 0.1919046
 - datetime: '2026-08-13T02:00:00+02:00'
   price_eur_kwh: 0.3045798
+  price_tax_excluded: 0.1937317
 - datetime: '2026-08-13T02:15:00+02:00'
   price_eur_kwh: 0.3040837
+  price_tax_excluded: 0.1932356
 - datetime: '2026-08-13T02:30:00+02:00'
   price_eur_kwh: 0.3055478
+  price_tax_excluded: 0.1946997
 - datetime: '2026-08-13T02:45:00+02:00'
   price_eur_kwh: 0.3033456
+  price_tax_excluded: 0.1924975
 - datetime: '2026-08-13T03:00:00+02:00'
   price_eur_kwh: 0.3013007
+  price_tax_excluded: 0.1904526
 - datetime: '2026-08-13T03:15:00+02:00'
   price_eur_kwh: 0.3024502
+  price_tax_excluded: 0.1916021
 - datetime: '2026-08-13T03:30:00+02:00'
   price_eur_kwh: 0.3047976
+  price_tax_excluded: 0.1939495
 - datetime: '2026-08-13T03:45:00+02:00'
   price_eur_kwh: 0.3056203
+  price_tax_excluded: 0.1947722
 - datetime: '2026-08-13T04:00:00+02:00'
   price_eur_kwh: 0.3014459
+  price_tax_excluded: 0.1905978
 - datetime: '2026-08-13T04:15:00+02:00'
   price_eur_kwh: 0.3039506
+  price_tax_excluded: 0.1931025
 - datetime: '2026-08-13T04:30:00+02:00'
   price_eur_kwh: 0.3081735
+  price_tax_excluded: 0.1973254
 - datetime: '2026-08-13T04:45:00+02:00'
   price_eur_kwh: 0.3112348
+  price_tax_excluded: 0.2003867
 - datetime: '2026-08-13T05:00:00+02:00'
   price_eur_kwh: 0.3113195
+  price_tax_excluded: 0.2004714
 - datetime: '2026-08-13T05:15:00+02:00'
   price_eur_kwh: 0.317793
+  price_tax_excluded: 0.2069449
 - datetime: '2026-08-13T05:30:00+02:00'
   price_eur_kwh: 0.3240608
+  price_tax_excluded: 0.2132127
 - datetime: '2026-08-13T05:45:00+02:00'
   price_eur_kwh: 0.3320226
+  price_tax_excluded: 0.2211745
 - datetime: '2026-08-13T06:00:00+02:00'
   price_eur_kwh: 0.3372861
+  price_tax_excluded: 0.226438
 - datetime: '2026-08-13T06:15:00+02:00'
   price_eur_kwh: 0.3414969
+  price_tax_excluded: 0.2306488
 - datetime: '2026-08-13T06:30:00+02:00'
   price_eur_kwh: 0.3453084
+  price_tax_excluded: 0.2344603
 - datetime: '2026-08-13T06:45:00+02:00'
   price_eur_kwh: 0.3425859
+  price_tax_excluded: 0.2317378
 - datetime: '2026-08-13T07:00:00+02:00'
   price_eur_kwh: 0.3516367
+  price_tax_excluded: 0.2407886
 - datetime: '2026-08-13T07:15:00+02:00'
   price_eur_kwh: 0.3424891
+  price_tax_excluded: 0.231641
 - datetime: '2026-08-13T07:30:00+02:00'
   price_eur_kwh: 0.3365359
+  price_tax_excluded: 0.2256878
 - datetime: '2026-08-13T07:45:00+02:00'
   price_eur_kwh: 0.3208422
+  price_tax_excluded: 0.2099941
 - datetime: '2026-08-13T08:00:00+02:00'
   price_eur_kwh: 0.3401659
+  price_tax_excluded: 0.2293178
 - datetime: '2026-08-13T08:15:00+02:00'
   price_eur_kwh: 0.3277149
+  price_tax_excluded: 0.2168668
 - datetime: '2026-08-13T08:30:00+02:00'
   price_eur_kwh: 0.3163531
+  price_tax_excluded: 0.205505
 - datetime: '2026-08-13T08:45:00+02:00'
   price_eur_kwh: 0.29807
+  price_tax_excluded: 0.1872219
 - datetime: '2026-08-13T09:00:00+02:00'
   price_eur_kwh: 0.3225361
+  price_tax_excluded: 0.211688
 - datetime: '2026-08-13T09:15:00+02:00'
   price_eur_kwh: 0.3088027
+  price_tax_excluded: 0.1979546
 - datetime: '2026-08-13T09:30:00+02:00'
   price_eur_kwh: 0.2863209
+  price_tax_excluded: 0.1754728
 - datetime: '2026-08-13T09:45:00+02:00'
   price_eur_kwh: 0.2741967
+  price_tax_excluded: 0.1633486
 - datetime: '2026-08-13T10:00:00+02:00'
   price_eur_kwh: 0.2977796
+  price_tax_excluded: 0.1869315
 - datetime: '2026-08-13T10:15:00+02:00'
   price_eur_kwh: 0.2791698
+  price_tax_excluded: 0.1683217
 - datetime: '2026-08-13T10:30:00+02:00'
   price_eur_kwh: 0.2532879
+  price_tax_excluded: 0.1424398
 - datetime: '2026-08-13T10:45:00+02:00'
   price_eur_kwh: 0.2272366
+  price_tax_excluded: 0.1163885
 - datetime: '2026-08-13T11:00:00+02:00'
   price_eur_kwh: 0.2512672
+  price_tax_excluded: 0.1404191
 - datetime: '2026-08-13T11:15:00+02:00'
   price_eur_kwh: 0.2131764
+  price_tax_excluded: 0.1023283
 - datetime: '2026-08-13T11:30:00+02:00'
   price_eur_kwh: 0.1807242
+  price_tax_excluded: 0.0698761
 - datetime: '2026-08-13T11:45:00+02:00'
   price_eur_kwh: 0.139923
+  price_tax_excluded: 0.0290749
 - datetime: '2026-08-13T12:00:00+02:00'
   price_eur_kwh: 0.1606624
+  price_tax_excluded: 0.0498143
 - datetime: '2026-08-13T12:15:00+02:00'
   price_eur_kwh: 0.1506557
+  price_tax_excluded: 0.0398076
 - datetime: '2026-08-13T12:30:00+02:00'
   price_eur_kwh: 0.1331591
+  price_tax_excluded: 0.022311
 - datetime: '2026-08-13T12:45:00+02:00'
   price_eur_kwh: 0.130848
+  price_tax_excluded: 0.0199999
 - datetime: '2026-08-13T13:00:00+02:00'
   price_eur_kwh: 0.1380838
+  price_tax_excluded: 0.0272357
 - datetime: '2026-08-13T13:15:00+02:00'
   price_eur_kwh: 0.1390276
+  price_tax_excluded: 0.0281795
 - datetime: '2026-08-13T13:30:00+02:00'
   price_eur_kwh: 0.1348773
+  price_tax_excluded: 0.0240292
 - datetime: '2026-08-13T13:45:00+02:00'
   price_eur_kwh: 0.1337641
+  price_tax_excluded: 0.022916
 - datetime: '2026-08-13T14:00:00+02:00'
   price_eur_kwh: 0.130848
+  price_tax_excluded: 0.0199999
 - datetime: '2026-08-13T14:15:00+02:00'
   price_eur_kwh: 0.1308601
+  price_tax_excluded: 0.020012
 - datetime: '2026-08-13T14:30:00+02:00'
   price_eur_kwh: 0.1357969
+  price_tax_excluded: 0.0249488
 - datetime: '2026-08-13T14:45:00+02:00'
   price_eur_kwh: 0.150087
+  price_tax_excluded: 0.0392389
 - datetime: '2026-08-13T15:00:00+02:00'
   price_eur_kwh: 0.1465417
+  price_tax_excluded: 0.0356936
 - datetime: '2026-08-13T15:15:00+02:00'
   price_eur_kwh: 0.1737667
+  price_tax_excluded: 0.0629186
 - datetime: '2026-08-13T15:30:00+02:00'
   price_eur_kwh: 0.2005682
+  price_tax_excluded: 0.0897201
 - datetime: '2026-08-13T15:45:00+02:00'
   price_eur_kwh: 0.2209809
+  price_tax_excluded: 0.1101328
 - datetime: '2026-08-13T16:00:00+02:00'
   price_eur_kwh: 0.225712
+  price_tax_excluded: 0.1148639
 - datetime: '2026-08-13T16:15:00+02:00'
   price_eur_kwh: 0.2664769
+  price_tax_excluded: 0.1556288
 - datetime: '2026-08-13T16:30:00+02:00'
   price_eur_kwh: 0.2802225
+  price_tax_excluded: 0.1693744
 - datetime: '2026-08-13T16:45:00+02:00'
   price_eur_kwh: 0.2889586
+  price_tax_excluded: 0.1781105
 - datetime: '2026-08-13T17:00:00+02:00'
   price_eur_kwh: 0.2821826
+  price_tax_excluded: 0.1713345
 - datetime: '2026-08-13T17:15:00+02:00'
   price_eur_kwh: 0.295287
+  price_tax_excluded: 0.1844389
 - datetime: '2026-08-13T17:30:00+02:00'
   price_eur_kwh: 0.3242907
+  price_tax_excluded: 0.2134426
 - datetime: '2026-08-13T17:45:00+02:00'
   price_eur_kwh: 0.3461675
+  price_tax_excluded: 0.2353194
 - datetime: '2026-08-13T18:00:00+02:00'
   price_eur_kwh: 0.330498
+  price_tax_excluded: 0.2196499
 - datetime: '2026-08-13T18:15:00+02:00'
   price_eur_kwh: 0.358328
+  price_tax_excluded: 0.2474799
 - datetime: '2026-08-13T18:30:00+02:00'
   price_eur_kwh: 0.3838106
+  price_tax_excluded: 0.2729625
 - datetime: '2026-08-13T18:45:00+02:00'
   price_eur_kwh: 0.4381033
+  price_tax_excluded: 0.3272552
 - datetime: '2026-08-13T19:00:00+02:00'
   price_eur_kwh: 0.4081316
+  price_tax_excluded: 0.2972835
 - datetime: '2026-08-13T19:15:00+02:00'
   price_eur_kwh: 0.4487029
+  price_tax_excluded: 0.3378548
 - datetime: '2026-08-13T19:30:00+02:00'
   price_eur_kwh: 0.5267237
+  price_tax_excluded: 0.4158756
 - datetime: '2026-08-13T19:45:00+02:00'
   price_eur_kwh: 0.7205778
+  price_tax_excluded: 0.6097297
 - datetime: '2026-08-13T20:00:00+02:00'
   price_eur_kwh: 0.6329496
+  price_tax_excluded: 0.5221015
 - datetime: '2026-08-13T20:15:00+02:00'
   price_eur_kwh: 0.5808954
+  price_tax_excluded: 0.4700473
 - datetime: '2026-08-13T20:30:00+02:00'
   price_eur_kwh: 0.4940173
+  price_tax_excluded: 0.3831692
 - datetime: '2026-08-13T20:45:00+02:00'
   price_eur_kwh: 0.4556241
+  price_tax_excluded: 0.344776
 - datetime: '2026-08-13T21:00:00+02:00'
   price_eur_kwh: 0.5590912
+  price_tax_excluded: 0.4482431
 - datetime: '2026-08-13T21:15:00+02:00'
   price_eur_kwh: 0.4563017
+  price_tax_excluded: 0.3454536
 - datetime: '2026-08-13T21:30:00+02:00'
   price_eur_kwh: 0.421248
+  price_tax_excluded: 0.3103999
 - datetime: '2026-08-13T21:45:00+02:00'
   price_eur_kwh: 0.3935995
+  price_tax_excluded: 0.2827514
 - datetime: '2026-08-13T22:00:00+02:00'
   price_eur_kwh: 0.4132378
+  price_tax_excluded: 0.3023897
 - datetime: '2026-08-13T22:15:00+02:00'
   price_eur_kwh: 0.3916151
+  price_tax_excluded: 0.280767
 - datetime: '2026-08-13T22:30:00+02:00'
   price_eur_kwh: 0.3873801
+  price_tax_excluded: 0.276532
 - datetime: '2026-08-13T22:45:00+02:00'
   price_eur_kwh: 0.3644143
+  price_tax_excluded: 0.2535662
 - datetime: '2026-08-13T23:00:00+02:00'
   price_eur_kwh: 0.3576383
+  price_tax_excluded: 0.2467902
 - datetime: '2026-08-13T23:15:00+02:00'
   price_eur_kwh: 0.337879
+  price_tax_excluded: 0.2270309
 - datetime: '2026-08-13T23:30:00+02:00'
   price_eur_kwh: 0.3234195
+  price_tax_excluded: 0.2125714
 - datetime: '2026-08-13T23:45:00+02:00'
   price_eur_kwh: 0.3166676
+  price_tax_excluded: 0.2058195

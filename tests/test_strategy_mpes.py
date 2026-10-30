@@ -229,14 +229,14 @@ async def test_sensor_algorithm_mpes_september20_disabled_solar_bonus(hass, free
     buys = [x for x in sept20_slots if x["action"] == ACTION_BUY]
     sells = [x for x in sept20_slots if x["action"] == ACTION_SELL]
 
-    # Verify that we still have the full optimal 11 quarters of Buy and 6 quarters of Sell scheduled on September 20th!
+    # Verify that we have the full optimal 11 quarters of Buy and 11 quarters of Sell scheduled on September 20th!
     assert len(buys) == 11
-    assert len(sells) == 6
+    assert len(sells) == 11
 
-    # Verify that the morning peak of Sept 21st (between 07:45 and 09:15) has been correctly utilized for discharging by Cycle 0!
-    sept21_morning = [x for x in schedule if x["datetime"].startswith("2026-09-21T07:45") or x["datetime"].startswith("2026-09-21T08") or x["datetime"].startswith("2026-09-21T09:00")]
-    morning_sells = [x for x in sept21_morning if x["action"] == ACTION_SELL]
-    assert len(morning_sells) == 4
+    # Verify that Cycle 1 also achieves the full 11 quarters of Sell scheduled on September 21st!
+    sept21_slots = [x for x in schedule if x["datetime"].startswith("2026-09-21")]
+    sept21_sells = [x for x in sept21_slots if x["action"] == ACTION_SELL]
+    assert len(sept21_sells) == 11
 
 
 
