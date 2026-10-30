@@ -13,7 +13,8 @@ class ArbitrageStrategy(ABC):
         discharge_slots_count: int,
         rte_factor: float,
         min_profit_eur_kwh: float,
-        now: datetime
+        now: datetime,
+        greedy_charge: bool = False,
     ) -> list[dict[str, Any]]:
         """
         Calculates the action schedule and returns the updated prepared_data list

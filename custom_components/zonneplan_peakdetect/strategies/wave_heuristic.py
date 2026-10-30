@@ -32,7 +32,8 @@ class WhssStrategy(ArbitrageStrategy):
         discharge_slots_count: int,
         rte_factor: float,
         min_profit_eur_kwh: float,
-        now: datetime
+        now: datetime,
+        greedy_charge: bool = False,
     ) -> list[dict[str, Any]]:
         """Calculates the BESS schedule using the WHSS Wave Heuristic."""
         buy_prices = [item.get('buy_price_eur_kwh', item['price_eur_kwh']) for item in prepared_data]
@@ -131,9 +132,13 @@ class WhssStrategy(ArbitrageStrategy):
                     continue
                 discharge_slots = discharge_cands[:discharge_slots_count]
 
-                # Balance charge and discharge slots
+                # Greedy charging reserves the surplus for self-consumption.
                 num_slots = min(len(charge_slots), len(discharge_slots))
-                charge_slots = charge_slots[:num_slots]
+                if greedy_charge and num_slots == 0:
+                    current_idx = segment_end
+                    continue
+                if not greedy_charge:
+                    charge_slots = charge_slots[:num_slots]
                 discharge_slots = discharge_slots[:num_slots]
 
                 for s in segment:

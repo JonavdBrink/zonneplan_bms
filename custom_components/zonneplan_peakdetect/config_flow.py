@@ -12,6 +12,7 @@ import homeassistant.helpers.config_validation as cv
 from .const import (
     CONF_CHARGE_QUARTERS,
     CONF_DISCHARGE_QUARTERS,
+    CONF_GREEDY_CHARGE,
     CONF_CONSUME_QUARTERS,
     CONF_SAVE_QUARTERS,
     DEFAULT_CONSUME_QUARTERS,
@@ -29,6 +30,7 @@ from .const import (
     DEFAULT_CENTS,
     DEFAULT_CHARGE_QUARTERS,
     DEFAULT_DISCHARGE_QUARTERS,
+    DEFAULT_GREEDY_CHARGE,
     DEFAULT_FORECAST_ENTITY,
     DEFAULT_PERCENTAGE,
     DEFAULT_ALGORITHM,
@@ -98,6 +100,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 CONF_DISCHARGE_QUARTERS, 
                 default=discharge_default
             ): cv.positive_int,
+            vol.Required(
+                CONF_GREEDY_CHARGE,
+                default=user_input.get(CONF_GREEDY_CHARGE, DEFAULT_GREEDY_CHARGE)
+            ): bool,
             vol.Required(
                 CONF_CONSUME_QUARTERS,
                 default=consume_default

@@ -22,7 +22,7 @@ Repository based on: [fsaris/home-assistant-zonneplan-one](https://github.com/fs
 - **Self-Consumption Modes**: Introduces customizable `Charge` (saving solar during day) and `Discharge` (consuming battery for local loads) modes on idle slots based on price multiplier percentile thresholds.
 - **Native Quarterly (15-Minute) Support**: Built to dynamically detect and support both **hourly** (60-minute) and **quarter-hourly** (15-minute) price forecasts. It seamlessly scales your configuration settings (e.g. `charge_quarters` is adjusted dynamically depending on interval spacing) and evaluates state matches at exact interval resolutions.
 - **Intelligent Wave-Segmentation Algorithm**: Divides the forecast into localized price "waves" to detect multiple profitable cycles within a single day.
-- **Dynamic Energy Balancing**: Constrains the charge slots in each interval by the number of profitable discharge slots to maintain energy balance.
+- **Dynamic Energy Balancing**: WHSS and MPES constrain charge slots by profitable discharge slots by default. Optional **Greedy charge** allows extra grid charging for self-consumption.
 - **Detailed Arbitrage Schedule**: Provides full access to the scheduled actions for every hour or quarter of the upcoming day via sensor attributes.
 - **HASS UI Configuration**: Fully configurable and reconfigurable via the standard Home Assistant Integrations UI, with full backwards-compatibility.
 
@@ -41,7 +41,7 @@ The **Standard (WHSS)** algorithm is the original and proven optimization engine
 4. **Slot Selection (Balanced)**:
    - **Buy Slots (Grid Charging)**: Selects the cheapest slots *before* the valley within the current wave where the price is low enough to yield the required profit.
    - **Sell Slots (Grid Feeding)**: Selects the most expensive slots *after* the valley within the current wave where the price is high enough to yield the required profit.
-   - To prevent over-charging/under-discharging, the scheduled charging slots are constrained by the number of available profitable discharging slots in that wave.
+   - By default, the scheduled charging slots are constrained by the number of available profitable discharging slots in that wave. Enable `greedy_charge` to allow extra charging for self-consumption.
 
 ---
 
@@ -74,6 +74,7 @@ During the integrations setup flow (or via **Configure**), you can customize the
 | **Minimum Profit** | `min_profit_c_kwh` | `6` | The minimum price difference (in cents per kWh) required between charge and discharge intervals to trigger an action. |
 | **Charge Quarters** | `charge_quarters` | `8` | Maximum charging duration (in 15-minute quarters) allowed per price wave/interval (e.g., `8` quarters = 2 hours). |
 | **Discharge Quarters** | `discharge_quarters` | `8` | Maximum discharging duration (in 15-minute quarters) allowed per price wave/interval (e.g., `8` quarters = 2 hours). |
+| **Greedy Charge** | `greedy_charge` | `false` | For WHSS and MPES, allow up to the configured charge quarters even when fewer profitable discharge quarters are scheduled. Sell slots remain capped by both the discharge quota and available charge slots. HSWAS already uses independent quotas and is unchanged. |
 | **Price Delta %** | `price_delta_percent` | `20` | Percentage threshold used for calculating price multipliers in attributes. This value acts as a technical guard band between your charge and discharge quantiles. |
 | **Solar Bonus %** | `solar_bonus_percent` | `10` | Sell-price bonus applied between sunrise and sunset. Set to `0` to disable it. |
 | **Fixed Solar Bonus** | `solar_bonus_fixed_c_kwh` | `2` | Fixed solar bonus added in cents/kWh around sunrise and sunset. Set to `0` to disable it. |
@@ -81,6 +82,8 @@ During the integrations setup flow (or via **Configure**), you can customize the
 | **Discharge Quantile** | `discharge_multiplier_quantile` | `75.0` | Percentile (0 to 100) of the price multiplier above which the battery is discharged for own consumption (`Discharge` action). Must be strictly higher than the Charge Quantile plus the Price Delta %. |
 
 *Note: If you are upgrading from an older version, your existing `charge_hours` and `discharge_hours` settings are automatically converted to quarters (`hours * 4`) for seamless backwards compatibility.*
+
+With **Greedy charge** enabled, `charge_quarters: 8` and `discharge_quarters: 4` can schedule 8 `Buy` quarters and 4 `Sell` quarters per wave instead of 4 and 4. The surplus energy can be used for household consumption; this option does not change the existing self-consumption controls or model battery capacity or household demand. Available slots, chronological boundaries, efficiency and minimum-profit conditions still apply, and a profitable discharge opportunity is still required. The option is off by default, including for existing installations.
 
 The default solar bonus is calculated as `(market price + 2 cents/kWh) * 1.10`, and applies only to the sell price between astronomical sunrise and sunset. The buy price remains the market price. The original forecast price is retained as `forecast_price_eur_kwh`; `buy_price_eur_kwh` is the price used for charging and `sell_price_eur_kwh` is the price used for discharging. The schedule also exposes `solar_bonus_applied` and `solar_bonus_multiplier` for each slot.
 
@@ -102,6 +105,7 @@ The integration registers a single sensor, `sensor.battery_optimizer_action` (En
 - **`min_profit_required_eur_kwh`**: The configured minimum profit threshold, converted to €/kWh (e.g., `0.06`).
 - **`charge_quarters`**: Configured maximum charging duration in quarters.
 - **`discharge_quarters`**: Configured maximum discharging duration in quarters.
+- **`greedy_charge`**: Whether extra grid charging for self-consumption is enabled (default `false`).
 - **`schedule`**: A structured list mapping actions and details for each slot of the upcoming forecast:
   ```json
   [
